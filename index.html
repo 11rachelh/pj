@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Visual Sampler</title>
+
+    <style>
+      /* =====================================================
+   Global
+===================================================== */
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+
+        width: 100%;
+        height: 100%;
+
+        overflow: hidden;
+
+        font-family: Arial, sans-serif;
+
+        background: white;
+
+        color: black;
+      }
+
+      /* =====================================================
+   Toolbar
+===================================================== */
+
+      .toolbar {
+        height: 60px;
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 8px;
+
+        padding: 10px 15px;
+
+        background: white;
+
+        border-bottom: 1px solid black;
+
+        position: relative;
+
+        z-index: 100;
+      }
+
+      button {
+        border: 1px solid black;
+
+        background: white;
+
+        color: black;
+
+        border-radius: 0;
+
+        padding: 8px 14px;
+
+        font-size: 14px;
+
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #eee;
+      }
+
+      .modeButton.active {
+        background: black;
+
+        color: white;
+      }
+
+      #addPad {
+        margin-left: auto;
+      }
+
+      #imageInput {
+        display: none;
+      }
+
+      /* =====================================================
+   Canvas
+===================================================== */
+
+      #canvas {
+        position: relative;
+
+        width: 100vw;
+
+        height: calc(100vh - 60px);
+
+        overflow: hidden;
+
+        background: white;
+      }
+
+      /* =====================================================
+   Image Object
+===================================================== */
+
+      .imageItem {
+        position: absolute;
+
+        user-select: none;
+
+        touch-action: none;
+
+        cursor: pointer;
+
+        z-index: 2;
+      }
+
+      .imageItem.selected {
+        outline: 2px dashed black;
+
+        outline-offset: 2px;
+      }
+
+      /* =====================================================
+   Image Resize Handle
+===================================================== */
+
+      .imageResizeHandle {
+        position: absolute;
+
+        width: 14px;
+
+        height: 14px;
+
+        right: -2px;
+
+        bottom: -2px;
+
+        background: black;
+
+        cursor: nwse-resize;
+
+        touch-action: none;
+
+        z-index: 5;
+      }
+
+      /* =====================================================
+   Pad
+===================================================== */
+
+      .pad {
+        position: absolute;
+
+        width: 15%;
+
+        height: 15%;
+
+        background: transparent;
+
+        border: 2px solid black;
+
+        border-radius: 0;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        user-select: none;
+
+        touch-action: none;
+
+        cursor: pointer;
+
+        z-index: 10;
+      }
+
+      .pad.selected {
+        border: 4px solid black;
+      }
+
+      .pad.recording {
+        border: 3px dashed black;
+      }
+
+      .pad.playing {
+        transform: scale(0.96);
+      }
+
+      /* =====================================================
+   Pad Content
+===================================================== */
+
+      .padContent {
+        text-align: center;
+
+        pointer-events: none;
+      }
+
+      .padName {
+        font-size: 16px;
+      }
+
+      .recordStatus {
+        margin-top: 6px;
+
+        font-size: 12px;
+
+        opacity: 0.7;
+      }
+
+      /* =====================================================
+   Pad Resize Handle
+===================================================== */
+
+      .resizeHandle {
+        position: absolute;
+
+        width: 14px;
+
+        height: 14px;
+
+        right: -2px;
+
+        bottom: -2px;
+
+        background: black;
+
+        cursor: nwse-resize;
+
+        touch-action: none;
+      }
+
+      /* =====================================================
+   Help
+===================================================== */
+
+      .help {
+        position: absolute;
+
+        left: 15px;
+
+        bottom: 15px;
+
+        font-size: 12px;
+
+        opacity: 0.6;
+
+        pointer-events: none;
+
+        z-index: 50;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- =====================================================
+     Toolbar
+===================================================== -->
+
+    <div class="toolbar">
+      <button id="editMode" class="modeButton active">EDIT</button>
+
+      <button id="playMode" class="modeButton">PLAY</button>
+
+      <button id="addPad">+ PAD</button>
+
+      <button id="addImage">+ IMAGE</button>
+
+      <button id="deleteButton">DELETE</button>
+
+      <input type="file" id="imageInput" accept="image/*" multiple />
+    </div>
+
+    <!-- =====================================================
+     Canvas
+===================================================== -->
+
+    <div id="canvas">
+      <div class="help">
+        EDIT： 點擊選取・拖曳移動・右下角調整大小・Delete 刪除
+      </div>
+    </div>
+
+    <script>
+      /* =====================================================
+   Sampler State
+===================================================== */
+
+      const sampler = {
+        mode: "edit",
+
+        /* -------------------------
+       Pads
+    ------------------------- */
+
+        pads: [],
+
+        selectedPad: null,
+
+        /* -------------------------
+       Images
+    ------------------------- */
+
+        images: [],
+
+        selectedImage: null,
+
+        nextPadId: 1,
+
+        nextImageId: 1,
+
+        /* -------------------------
+       Audio
+    ------------------------- */
+
+        audioContext: null,
+
+        mediaStream: null,
+
+        recorder: null,
+
+        recordingPad: null,
+
+        chunks: [],
+
+        /* -------------------------
+       Recording timer
+    ------------------------- */
+
+        recordingTimer: null,
+
+        recordingStartTime: null,
+      };
+
+      /* =====================================================
+   DOM
+===================================================== */
+
+      const canvas = document.getElementById("canvas");
+
+      const editModeButton = document.getElementById("editMode");
+
+      const playModeButton = document.getElementById("playMode");
+
+      const addPadButton = document.getElementById("addPad");
+
+      const addImageButton = document.getElementById("addImage");
+
+      const deleteButton = document.getElementById("deleteButton");
+
+      const imageInput = document.getElementById("imageInput");
+
+      /* =====================================================
+   Interaction Settings
+===================================================== */
+
+      const CLICK_TIME = 250;
+
+      const DRAG_THRESHOLD = 5;
+
+      /*
+   iPad / Touch 雙擊判斷
+
+   兩次點擊在這個時間內
+   → 視為雙擊
+*/
+
+      const DOUBLE_TAP_TIME = 350;
+
+      /* =====================================================
+   Percentage Helpers
+===================================================== */
+
+      function pxToPercentX(px) {
+        return (px / canvas.clientWidth) * 100;
+      }
+
+      function pxToPercentY(px) {
+        return (px / canvas.clientHeight) * 100;
+      }
+
+      /* =====================================================
+   Selection
+===================================================== */
+
+      function clearSelection() {
+        sampler.pads.forEach((pad) => {
+          if (pad.element) {
+            pad.element.classList.remove("selected");
+          }
+        });
+
+        sampler.images.forEach((image) => {
+          if (image.element) {
+            image.element.classList.remove("selected");
+          }
+        });
+
+        sampler.selectedPad = null;
+
+        sampler.selectedImage = null;
+      }
+
+      /* =====================================================
+   Select Pad
+===================================================== */
+
+      function selectPad(pad) {
+        clearSelection();
+
+        sampler.selectedPad = pad;
+
+        pad.element.classList.add("selected");
+      }
+
+      /* =====================================================
+   Select Image
+===================================================== */
+
+      function selectImage(image) {
+        clearSelection();
+
+        sampler.selectedImage = image;
+
+        image.element.classList.add("selected");
+      }
+
+      /* =====================================================
+   Audio
+===================================================== */
+
+      function initAudio() {
+        if (!sampler.audioContext) {
+          const AudioContextClass =
+            window.AudioContext || window.webkitAudioContext;
+
+          sampler.audioContext = new AudioContextClass();
+        }
+      }
+
+      /* =====================================================
+   Get Supported Recording Format
+===================================================== */
+
+      function getRecordingMimeType() {
+        const types = [
+          "audio/mp4",
+
+          "audio/webm;codecs=opus",
+
+          "audio/webm",
+
+          "audio/ogg;codecs=opus",
+        ];
+
+        for (const type of types) {
+          if (
+            typeof MediaRecorder !== "undefined" &&
+            MediaRecorder.isTypeSupported &&
+            MediaRecorder.isTypeSupported(type)
+          ) {
+            return type;
+          }
+        }
+
+        return "";
+      }
+
+      /* =====================================================
+   Create Pad
+===================================================== */
+
+      function createPad(x = 10, y = 10) {
+        const id = sampler.nextPadId++;
+
+        const pad = {
+          id: id,
+
+          name: `PAD ${id}`,
+
+          x: x,
+
+          y: y,
+
+          width: 15,
+
+          height: 15,
+
+          audioURL: null,
+
+          audioBuffer: null,
+
+          element: null,
+
+          lastTapTime: 0,
+        };
+
+        sampler.pads.push(pad);
+
+        renderPad(pad);
+
+        selectPad(pad);
+      }
+
+      /* =====================================================
+   Render Pad
+===================================================== */
+
+      function renderPad(pad) {
+        const element = document.createElement("div");
+
+        element.className = "pad";
+
+        const content = document.createElement("div");
+
+        content.className = "padContent";
+
+        content.innerHTML = `
+
+        <div class="padName">
+            ${pad.name}
+        </div>
+
+        <div class="recordStatus">
+            NO SOUND
+        </div>
+
+    `;
+
+        const resizeHandle = document.createElement("div");
+
+        resizeHandle.className = "resizeHandle";
+
+        element.appendChild(content);
+
+        element.appendChild(resizeHandle);
+
+        canvas.appendChild(element);
+
+        pad.element = element;
+
+        updatePad(pad);
+
+        setupPadInteraction(pad, element, resizeHandle);
+      }
+
+      /* =====================================================
+   Update Pad
+===================================================== */
+
+      function updatePad(pad) {
+        if (!pad.element) return;
+
+        pad.element.style.left = pad.x + "%";
+
+        pad.element.style.top = pad.y + "%";
+
+        pad.element.style.width = pad.width + "%";
+
+        pad.element.style.height = pad.height + "%";
+      }
+
+      /* =====================================================
+   Pad Interaction
+===================================================== */
+
+      function setupPadInteraction(pad, element, resizeHandle) {
+        let startX = 0;
+
+        let startY = 0;
+
+        let startPadX = 0;
+
+        let startPadY = 0;
+
+        let startWidth = 0;
+
+        let startHeight = 0;
+
+        let pointerDownTime = 0;
+
+        let moved = false;
+
+        let action = null;
+
+        /* =================================================
+       Pointer Down
+    ================================================= */
+
+        element.addEventListener("pointerdown", (event) => {
+          if (sampler.mode !== "edit") return;
+
+          event.preventDefault();
+
+          element.setPointerCapture(event.pointerId);
+
+          startX = event.clientX;
+
+          startY = event.clientY;
+
+          startPadX = pad.x;
+
+          startPadY = pad.y;
+
+          startWidth = pad.width;
+
+          startHeight = pad.height;
+
+          pointerDownTime = Date.now();
+
+          moved = false;
+
+          /* -------------------------
+               Resize
+            ------------------------- */
+
+          if (event.target === resizeHandle) {
+            action = "resize";
+          } else {
+            action = "none";
+          }
+
+          /* -------------------------
+               Select
+            ------------------------- */
+
+          selectPad(pad);
+        });
+
+        /* =================================================
+       Pointer Move
+    ================================================= */
+
+        element.addEventListener("pointermove", (event) => {
+          if (sampler.mode !== "edit") return;
+
+          if (action === null) return;
+
+          const dx = event.clientX - startX;
+
+          const dy = event.clientY - startY;
+
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          /* -------------------------
+               Resize
+            ------------------------- */
+
+          if (action === "resize") {
+            moved = true;
+
+            pad.width = Math.max(3, startWidth + pxToPercentX(dx));
+
+            pad.height = Math.max(3, startHeight + pxToPercentY(dy));
+
+            updatePad(pad);
+
+            return;
+          }
+
+          /* -------------------------
+               Drag
+            ------------------------- */
+
+          if (distance > DRAG_THRESHOLD) {
+            moved = true;
+
+            action = "drag";
+
+            pad.x = startPadX + pxToPercentX(dx);
+
+            pad.y = startPadY + pxToPercentY(dy);
+
+            updatePad(pad);
+          }
+        });
+
+        /* =================================================
+       Pointer Up
+    ================================================= */
+
+        element.addEventListener("pointerup", (event) => {
+          if (sampler.mode !== "edit") return;
+
+          /* -------------------------
+               Drag / Resize
+            ------------------------- */
+
+          if (moved) {
+            action = null;
+
+            return;
+          }
+
+          /* -------------------------
+               錄音中的 Pad
+               單擊 → 停止
+            ------------------------- */
+
+          if (sampler.recordingPad === pad) {
+            stopRecording();
+
+            action = null;
+
+            return;
+          }
+
+          /* -------------------------
+               點擊時間
+            ------------------------- */
+
+          const duration = Date.now() - pointerDownTime;
+
+          if (duration >= CLICK_TIME) {
+            action = null;
+
+            return;
+          }
+
+          /* -------------------------
+               雙擊判斷
+            ------------------------- */
+
+          const now = Date.now();
+
+          const timeSinceLastTap = now - pad.lastTapTime;
+
+          if (timeSinceLastTap < DOUBLE_TAP_TIME) {
+            /*
+                    清除上一次點擊時間，
+                    避免第三次點擊又被
+                    判斷成雙擊。
+                */
+
+            pad.lastTapTime = 0;
+
+            /*
+                    第二次點擊本身
+                    就直接啟動錄音。
+
+                    getUserMedia()
+                    會在這裡立即要求
+                    麥克風權限。
+                */
+
+            startRecording(pad);
+          } else {
+            /*
+                    第一次點擊
+                */
+
+            pad.lastTapTime = now;
+
+            selectPad(pad);
+          }
+
+          action = null;
+        });
+      }
+
+      /* =====================================================
+   Add Image
+===================================================== */
+
+      addImageButton.addEventListener("click", () => {
+        imageInput.click();
+      });
+
+      /* =====================================================
+   Image Selected
+===================================================== */
+
+      imageInput.addEventListener("change", (event) => {
+        const files = Array.from(event.target.files);
+
+        files.forEach((file) => {
+          createImage(file);
+        });
+
+        imageInput.value = "";
+      });
+
+      /* =====================================================
+   Create Image
+===================================================== */
+
+      function createImage(file) {
+        const id = sampler.nextImageId++;
+
+        const image = {
+          id: id,
+
+          x: 10 + Math.random() * 30,
+
+          y: 10 + Math.random() * 30,
+
+          width: 30,
+
+          height: 30,
+
+          url: URL.createObjectURL(file),
+
+          element: null,
+        };
+
+        sampler.images.push(image);
+
+        renderImage(image);
+
+        selectImage(image);
+      }
+
+      /* =====================================================
+   Render Image
+===================================================== */
+
+      function renderImage(image) {
+        const wrapper = document.createElement("div");
+
+        wrapper.className = "imageItem";
+
+        wrapper.style.left = image.x + "%";
+
+        wrapper.style.top = image.y + "%";
+
+        wrapper.style.width = image.width + "%";
+
+        wrapper.style.height = image.height + "%";
+
+        wrapper.style.zIndex = 2;
+
+        const img = document.createElement("img");
+
+        img.src = image.url;
+
+        img.draggable = false;
+
+        img.style.width = "100%";
+
+        img.style.height = "100%";
+
+        img.style.objectFit = "fill";
+
+        img.style.pointerEvents = "none";
+
+        const resizeHandle = document.createElement("div");
+
+        resizeHandle.className = "imageResizeHandle";
+
+        wrapper.appendChild(img);
+
+        wrapper.appendChild(resizeHandle);
+
+        canvas.appendChild(wrapper);
+
+        image.element = wrapper;
+
+        setupImageInteraction(image, wrapper, resizeHandle);
+      }
+
+      /* =====================================================
+   Update Image
+===================================================== */
+
+      function updateImage(image) {
+        if (!image.element) return;
+
+        image.element.style.left = image.x + "%";
+
+        image.element.style.top = image.y + "%";
+
+        image.element.style.width = image.width + "%";
+
+        image.element.style.height = image.height + "%";
+      }
+
+      /* =====================================================
+   Image Interaction
+===================================================== */
+
+      function setupImageInteraction(image, element, resizeHandle) {
+        let startX;
+
+        let startY;
+
+        let startImageX;
+
+        let startImageY;
+
+        let startWidth;
+
+        let startHeight;
+
+        let action = null;
+
+        element.addEventListener("pointerdown", (event) => {
+          if (sampler.mode !== "edit") return;
+
+          event.preventDefault();
+
+          element.setPointerCapture(event.pointerId);
+
+          selectImage(image);
+
+          startX = event.clientX;
+
+          startY = event.clientY;
+
+          startImageX = image.x;
+
+          startImageY = image.y;
+
+          startWidth = image.width;
+
+          startHeight = image.height;
+
+          if (event.target === resizeHandle) {
+            action = "resize";
+          } else {
+            action = "drag";
+          }
+        });
+
+        element.addEventListener("pointermove", (event) => {
+          if (sampler.mode !== "edit") return;
+
+          if (!action) return;
+
+          const dx = event.clientX - startX;
+
+          const dy = event.clientY - startY;
+
+          if (action === "drag") {
+            image.x = startImageX + pxToPercentX(dx);
+
+            image.y = startImageY + pxToPercentY(dy);
+          }
+
+          if (action === "resize") {
+            image.width = Math.max(3, startWidth + pxToPercentX(dx));
+
+            image.height = Math.max(3, startHeight + pxToPercentY(dy));
+          }
+
+          updateImage(image);
+        });
+
+        element.addEventListener("pointerup", () => {
+          action = null;
+        });
+      }
+
+      /* =====================================================
+   Delete Selected Object
+===================================================== */
+
+      function deleteSelected() {
+        /* -------------------------
+       Delete Pad
+    ------------------------- */
+
+        if (sampler.selectedPad) {
+          const pad = sampler.selectedPad;
+
+          if (sampler.recordingPad === pad) {
+            stopRecording();
+          }
+
+          if (pad.audioURL) {
+            URL.revokeObjectURL(pad.audioURL);
+          }
+
+          if (pad.element) {
+            pad.element.remove();
+          }
+
+          sampler.pads = sampler.pads.filter((p) => p !== pad);
+
+          sampler.selectedPad = null;
+
+          return;
+        }
+
+        /* -------------------------
+       Delete Image
+    ------------------------- */
+
+        if (sampler.selectedImage) {
+          const image = sampler.selectedImage;
+
+          if (image.url) {
+            URL.revokeObjectURL(image.url);
+          }
+
+          if (image.element) {
+            image.element.remove();
+          }
+
+          sampler.images = sampler.images.filter((img) => img !== image);
+
+          sampler.selectedImage = null;
+        }
+      }
+
+      /* =====================================================
+   Delete Button
+===================================================== */
+
+      deleteButton.addEventListener("click", deleteSelected);
+
+      /* =====================================================
+   Keyboard Delete
+===================================================== */
+
+      document.addEventListener("keydown", (event) => {
+        if (sampler.mode !== "edit") return;
+
+        if (event.key !== "Delete" && event.key !== "Backspace") return;
+
+        const tag = document.activeElement?.tagName;
+
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+        event.preventDefault();
+
+        deleteSelected();
+      });
+
+      /* =====================================================
+   Audio Recording
+===================================================== */
+
+      async function startRecording(pad) {
+        if (sampler.recordingPad) return;
+
+        try {
+          /*
+        =================================================
+        1. 初始化 AudioContext
+        =================================================
+        */
+
+          initAudio();
+
+          /*
+        =================================================
+        2. iPad Safari：
+           立即要求麥克風權限
+
+           這裡是整個錄音流程
+           最重要的部分。
+        =================================================
+        */
+
+          if (!sampler.mediaStream) {
+            sampler.mediaStream = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+            });
+          }
+
+          /*
+        =================================================
+        3. AudioContext Resume
+        =================================================
+        */
+
+          if (sampler.audioContext.state === "suspended") {
+            await sampler.audioContext.resume();
+          }
+
+          /*
+        =================================================
+        4. 確認 MediaRecorder
+        =================================================
+        */
+
+          if (typeof MediaRecorder === "undefined") {
+            throw new Error("此瀏覽器不支援 MediaRecorder");
+          }
+
+          /*
+        =================================================
+        5. 選擇 Safari / Chrome
+           支援的錄音格式
+        =================================================
+        */
+
+          const mimeType = getRecordingMimeType();
+
+          const recorderOptions = mimeType ? { mimeType: mimeType } : undefined;
+
+          sampler.recordingPad = pad;
+
+          sampler.chunks = [];
+
+          sampler.recorder = new MediaRecorder(
+            sampler.mediaStream,
+            recorderOptions,
+          );
+
+          /*
+        =================================================
+        6. Recording Data
+        =================================================
+        */
+
+          sampler.recorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              sampler.chunks.push(event.data);
+            }
+          };
+
+          /*
+        =================================================
+        7. Recording Stop
+        =================================================
+        */
+
+          sampler.recorder.onstop = async () => {
+            try {
+              const actualType =
+                sampler.recorder?.mimeType || mimeType || "audio/mp4";
+
+              const blob = new Blob(sampler.chunks, {
+                type: actualType,
+              });
+
+              /*
+                    -------------------------
+                    Remove old audio
+                    -------------------------
+                    */
+
+              if (pad.audioURL) {
+                URL.revokeObjectURL(pad.audioURL);
+              }
+
+              /*
+                    -------------------------
+                    Create audio URL
+                    -------------------------
+                    */
+
+              pad.audioURL = URL.createObjectURL(blob);
+
+              /*
+                    -------------------------
+                    Decode audio
+                    -------------------------
+                    */
+
+              const arrayBuffer = await blob.arrayBuffer();
+
+              pad.audioBuffer =
+                await sampler.audioContext.decodeAudioData(arrayBuffer);
+
+              updatePadStatus(pad, "READY");
+            } catch (error) {
+              console.error("Audio decode error:", error);
+
+              updatePadStatus(pad, "ERROR");
+            }
+
+            sampler.recordingPad = null;
+
+            sampler.recorder = null;
+          };
+
+          /*
+        =================================================
+        8. Start Recording
+        =================================================
+        */
+
+          sampler.recorder.start();
+
+          sampler.recordingStartTime = Date.now();
+
+          sampler.recordingTimer = setInterval(updateRecordingTimer, 1000);
+
+          pad.element.classList.add("recording");
+
+          updateRecordingText(pad, "● REC 00:00");
+        } catch (error) {
+          console.error("Recording error:", error);
+
+          /*
+        -------------------------
+        清除可能失敗的狀態
+        -------------------------
+        */
+
+          sampler.recordingPad = null;
+
+          sampler.recorder = null;
+
+          clearInterval(sampler.recordingTimer);
+
+          sampler.recordingTimer = null;
+
+          if (pad.element) {
+            pad.element.classList.remove("recording");
+          }
+
+          /*
+        -------------------------
+        使用者拒絕權限
+        -------------------------
+        */
+
+          if (error.name === "NotAllowedError") {
+            alert(
+              "無法錄音。\n\n請在 iPad 的 Safari 網站設定中允許使用麥克風。",
+            );
+          } else if (error.name === "NotFoundError") {
+            alert("找不到麥克風。");
+          } else {
+            alert("無法開始錄音。\n\n請確認網站使用 HTTPS，並允許麥克風權限。");
+          }
+        }
+      }
+
+      /* =====================================================
+   Recording Timer
+===================================================== */
+
+      function updateRecordingTimer() {
+        if (!sampler.recordingPad) return;
+
+        const elapsed = Math.floor(
+          (Date.now() - sampler.recordingStartTime) / 1000,
+        );
+
+        const minutes = String(Math.floor(elapsed / 60)).padStart(2, "0");
+
+        const seconds = String(elapsed % 60).padStart(2, "0");
+
+        updateRecordingText(
+          sampler.recordingPad,
+
+          `● REC ${minutes}:${seconds}`,
+        );
+      }
+
+      /* =====================================================
+   Stop Recording
+===================================================== */
+
+      function stopRecording() {
+        if (!sampler.recorder) return;
+
+        sampler.recorder.stop();
+
+        clearInterval(sampler.recordingTimer);
+
+        sampler.recordingTimer = null;
+
+        if (sampler.recordingPad) {
+          sampler.recordingPad.element.classList.remove("recording");
+        }
+      }
+
+      /* =====================================================
+   Pad Status
+===================================================== */
+
+      function updatePadStatus(pad, status) {
+        pad.element.querySelector(".recordStatus").textContent = status;
+      }
+
+      function updateRecordingText(pad, text) {
+        pad.element.querySelector(".recordStatus").textContent = text;
+      }
+
+      /* =====================================================
+   Play Pad
+===================================================== */
+
+      function playPad(pad) {
+        if (!pad.audioBuffer) return;
+
+        initAudio();
+
+        if (sampler.audioContext.state === "suspended") {
+          sampler.audioContext.resume();
+        }
+
+        const source = sampler.audioContext.createBufferSource();
+
+        source.buffer = pad.audioBuffer;
+
+        source.connect(sampler.audioContext.destination);
+
+        source.start();
+
+        pad.element.classList.add("playing");
+
+        source.onended = () => {
+          pad.element.classList.remove("playing");
+        };
+      }
+
+      /* =====================================================
+   PLAY MODE
+===================================================== */
+
+      function enablePlayMode() {
+        if (sampler.recordingPad) {
+          stopRecording();
+        }
+
+        sampler.mode = "play";
+
+        clearSelection();
+
+        editModeButton.classList.remove("active");
+
+        playModeButton.classList.add("active");
+
+        addPadButton.style.display = "none";
+
+        addImageButton.style.display = "none";
+
+        deleteButton.style.display = "none";
+      }
+
+      /* =====================================================
+   EDIT MODE
+===================================================== */
+
+      function enableEditMode() {
+        sampler.mode = "edit";
+
+        editModeButton.classList.add("active");
+
+        playModeButton.classList.remove("active");
+
+        addPadButton.style.display = "block";
+
+        addImageButton.style.display = "block";
+
+        deleteButton.style.display = "block";
+      }
+
+      /* =====================================================
+   Mode Buttons
+===================================================== */
+
+      editModeButton.addEventListener("click", enableEditMode);
+
+      playModeButton.addEventListener("click", enablePlayMode);
+
+      /* =====================================================
+   Add Pad
+===================================================== */
+
+      addPadButton.addEventListener("click", () => {
+        createPad(
+          10 + Math.random() * 50,
+
+          10 + Math.random() * 50,
+        );
+      });
+
+      /* =====================================================
+   PLAY Mode Interaction
+===================================================== */
+
+      canvas.addEventListener("pointerdown", (event) => {
+        if (sampler.mode !== "play") return;
+
+        const padElement = event.target.closest(".pad");
+
+        if (!padElement) return;
+
+        const pad = sampler.pads.find((p) => p.element === padElement);
+
+        if (pad) {
+          playPad(pad);
+        }
+      });
+
+      /* =====================================================
+   Window Resize
+===================================================== */
+
+      window.addEventListener("resize", () => {
+        sampler.pads.forEach((pad) => {
+          updatePad(pad);
+        });
+
+        sampler.images.forEach((image) => {
+          updateImage(image);
+        });
+      });
+
+      /* =====================================================
+   Initial Pads
+===================================================== */
+
+      createPad(10, 10);
+
+      createPad(32, 18);
+    </script>
+  </body>
+</html>
