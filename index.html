@@ -5,18 +5,34 @@
 
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
 
     <title>Visual Sampler</title>
 
     <style>
       /* =====================================================
-     GLOBAL
-  ===================================================== */
+         GLOBAL
+      ===================================================== */
 
       * {
         box-sizing: border-box;
+
+        /*
+         * 禁止所有文字選取。
+         */
+        -webkit-user-select: none;
+        user-select: none;
+
+        /*
+         * 禁止 iOS 長按叫出選單。
+         */
+        -webkit-touch-callout: none;
+
+        /*
+         * 禁止瀏覽器預設 touch gesture。
+         */
+        -webkit-tap-highlight-color: transparent;
       }
 
       html,
@@ -35,12 +51,40 @@
         color: black;
 
         overscroll-behavior: none;
+
+        /*
+         * 防止雙擊縮放 / pinch zoom。
+         */
+        touch-action: none;
+
+        /*
+         * iOS Safari。
+         */
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
       }
 
       body {
         -webkit-user-select: none;
         user-select: none;
 
+        -webkit-touch-callout: none;
+
+        touch-action: none;
+      }
+
+      /*
+       * 所有文字元素都禁止選取。
+       */
+      body,
+      div,
+      span,
+      button,
+      label,
+      input,
+      img {
+        -webkit-user-select: none;
+        user-select: none;
         -webkit-touch-callout: none;
       }
 
@@ -49,9 +93,16 @@
         font-family: inherit;
       }
 
+      button {
+        /*
+         * 禁止瀏覽器自行處理 touch gesture。
+         */
+        touch-action: none;
+      }
+
       /* =====================================================
-     TOOLBAR
-  ===================================================== */
+         TOOLBAR
+      ===================================================== */
 
       .toolbar {
         position: fixed;
@@ -79,6 +130,11 @@
         overflow-y: hidden;
 
         -webkit-overflow-scrolling: touch;
+
+        /*
+         * Toolbar 需要橫向滑動。
+         */
+        touch-action: pan-x;
       }
 
       button {
@@ -96,8 +152,6 @@
         font-size: 14px;
 
         cursor: pointer;
-
-        touch-action: manipulation;
 
         -webkit-tap-highlight-color: transparent;
       }
@@ -119,13 +173,6 @@
         margin-left: auto;
       }
 
-      /*
-     IMPORTANT
-
-     不再動態建立 audio input。
-     直接使用 HTML 裡的 #audioInput。
-  */
-
       #imageInput,
       #audioInput {
         position: fixed;
@@ -139,8 +186,8 @@
       }
 
       /* =====================================================
-     CANVAS
-  ===================================================== */
+         CANVAS
+      ===================================================== */
 
       #canvas {
         position: fixed;
@@ -156,11 +203,19 @@
         overflow: hidden;
 
         background: white;
+
+        /*
+         * 完全禁止 canvas 區域的瀏覽器手勢。
+         */
+        touch-action: none;
+
+        -webkit-user-select: none;
+        user-select: none;
       }
 
       /* =====================================================
-     IMAGE OBJECT
-  ===================================================== */
+         IMAGE OBJECT
+      ===================================================== */
 
       .imageItem {
         position: absolute;
@@ -173,6 +228,8 @@
         cursor: pointer;
 
         z-index: 2;
+
+        -webkit-touch-callout: none;
       }
 
       .imageItem.selected {
@@ -199,8 +256,8 @@
       }
 
       /* =====================================================
-     PAD
-  ===================================================== */
+         PAD
+      ===================================================== */
 
       .pad {
         position: absolute;
@@ -222,6 +279,10 @@
         user-select: none;
         -webkit-user-select: none;
 
+        /*
+         * 最重要：
+         * PAD 不允許瀏覽器自己處理 touch。
+         */
         touch-action: none;
 
         cursor: pointer;
@@ -231,6 +292,8 @@
         mix-blend-mode: difference;
 
         -webkit-tap-highlight-color: transparent;
+
+        -webkit-touch-callout: none;
       }
 
       .pad.selected {
@@ -241,20 +304,47 @@
         border: 3px dashed white;
       }
 
+      /*
+       * PAD 正在被長按播放。
+       */
       .pad.playing {
         transform: scale(0.96);
       }
 
+      /*
+       * 長按播放時增加一點視覺提示。
+       */
+      .pad.holding {
+        transform: scale(0.96);
+      }
+
       .padContent {
+        width: 100%;
+        height: 100%;
+
+        display: flex;
+        flex-direction: column;
+
+        align-items: center;
+        justify-content: center;
+
         text-align: center;
 
         pointer-events: none;
 
         color: white;
+
+        padding: 8px;
       }
 
       .padName {
         font-size: 16px;
+
+        max-width: 100%;
+
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .recordStatus {
@@ -264,6 +354,90 @@
 
         opacity: 0.7;
       }
+
+      /* =====================================================
+         PAD VOLUME CONTROL
+      ===================================================== */
+
+      .padControls {
+        position: absolute;
+
+        left: 8px;
+        right: 8px;
+        bottom: 7px;
+
+        display: flex;
+        align-items: center;
+
+        gap: 6px;
+
+        z-index: 20;
+
+        pointer-events: auto;
+
+        /*
+         * Slider 本身需要可以操作。
+         */
+        touch-action: none;
+      }
+
+      .padVolumeLabel {
+        flex-shrink: 0;
+
+        font-size: 10px;
+
+        color: white;
+
+        opacity: 0.8;
+
+        mix-blend-mode: difference;
+      }
+
+      .padVolume {
+        flex: 1;
+
+        min-width: 0;
+
+        height: 16px;
+
+        margin: 0;
+
+        accent-color: black;
+
+        cursor: pointer;
+
+        /*
+         * range input 保留自己的操作。
+         */
+        touch-action: auto;
+
+        pointer-events: auto;
+      }
+
+      .padVolumeValue {
+        width: 34px;
+
+        flex-shrink: 0;
+
+        font-size: 10px;
+
+        color: white;
+
+        text-align: right;
+
+        mix-blend-mode: difference;
+      }
+
+      /*
+       * Play Mode 不需要看到個別 PAD volume。
+       */
+      #canvas.playMode .padControls {
+        display: none;
+      }
+
+      /* =====================================================
+         PAD RESIZE
+      ===================================================== */
 
       .resizeHandle {
         position: absolute;
@@ -280,14 +454,14 @@
 
         touch-action: none;
 
-        z-index: 5;
+        z-index: 30;
 
         mix-blend-mode: difference;
       }
 
       /* =====================================================
-     PLAY MODE
-  ===================================================== */
+         PLAY MODE
+      ===================================================== */
 
       #canvas.playMode .resizeHandle,
       #canvas.playMode .imageResizeHandle {
@@ -299,22 +473,8 @@
       }
 
       /* =====================================================
-     LOOP AREA
-  =====================================================
-
-     IMPORTANT FOR iPAD
-
-     舊版本：
-
-       position: absolute;
-       bottom: 0;
-       transform: translateY(100%);
-
-     iPad Safari 在 100vh / pointer / viewport
-     情況下可能造成 Loop Area 看不到。
-
-     新版本直接 fixed。
-  */
+         LOOP AREA
+      ===================================================== */
 
       .loopArea {
         position: fixed;
@@ -327,7 +487,7 @@
 
         padding: 10px 15px calc(10px + env(safe-area-inset-bottom));
 
-        display: flex;
+        display: none;
 
         align-items: center;
 
@@ -339,39 +499,68 @@
 
         z-index: 2000;
 
-        /*
-       預設藏起來
-    */
-
-        display: none;
-
-        /*
-       iOS Safari
-    */
-
         -webkit-transform: translateZ(0);
         transform: translateZ(0);
-
-        /*
-       避免 iPad touch scrolling 把整個 loop bar 拖走
-    */
 
         touch-action: none;
       }
 
-      /*
-     PLAY MODE 時直接顯示。
-
-     不使用 transform。
-  */
-
-      #canvas.playMode .loopArea {
+      body.playMode .loopArea {
         display: flex;
       }
 
       /* =====================================================
-     LOOP BUTTON
-  ===================================================== */
+         MASTER VOLUME
+      ===================================================== */
+
+      .masterVolume {
+        width: 150px;
+
+        flex-shrink: 0;
+
+        display: flex;
+        flex-direction: column;
+
+        justify-content: center;
+
+        gap: 4px;
+      }
+
+      .masterHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        font-size: 11px;
+      }
+
+      .masterLabel {
+        font-size: 12px;
+      }
+
+      .masterValue {
+        font-size: 11px;
+
+        opacity: 0.65;
+      }
+
+      #masterVolumeSlider {
+        width: 100%;
+
+        height: 18px;
+
+        margin: 0;
+
+        accent-color: black;
+
+        cursor: pointer;
+
+        touch-action: auto;
+      }
+
+      /* =====================================================
+         LOOP BUTTON
+      ===================================================== */
 
       .loopButton {
         width: 80px;
@@ -405,8 +594,8 @@
       }
 
       /* =====================================================
-     RESET LOOP
-  ===================================================== */
+         RESET LOOP
+      ===================================================== */
 
       .resetLoopButton {
         height: 48px;
@@ -423,7 +612,7 @@
 
         display: none;
 
-        touch-action: manipulation;
+        touch-action: none;
       }
 
       .resetLoopButton.visible {
@@ -435,8 +624,8 @@
       }
 
       /* =====================================================
-     LOOP INFO
-  ===================================================== */
+         LOOP INFO
+      ===================================================== */
 
       .loopInfo {
         width: 100px;
@@ -457,8 +646,8 @@
       }
 
       /* =====================================================
-     LOOP LAYERS
-  ===================================================== */
+         LOOP LAYERS
+      ===================================================== */
 
       .loopLayers {
         flex: 1;
@@ -530,7 +719,7 @@
 
         flex-shrink: 0;
 
-        touch-action: manipulation;
+        touch-action: none;
       }
 
       .muteButton.active {
@@ -539,8 +728,8 @@
       }
 
       /* =====================================================
-     RECORDING INDICATOR
-  ===================================================== */
+         RECORDING INDICATOR
+      ===================================================== */
 
       .loopRecordingIndicator {
         position: fixed;
@@ -570,8 +759,8 @@
       }
 
       /* =====================================================
-     HELP
-  ===================================================== */
+         HELP
+      ===================================================== */
 
       .help {
         position: absolute;
@@ -593,8 +782,8 @@
       }
 
       /* =====================================================
-     iPAD / SMALL SCREEN
-  ===================================================== */
+         SMALL SCREEN
+      ===================================================== */
 
       @media (max-width: 800px) {
         .toolbar {
@@ -623,6 +812,10 @@
           gap: 8px;
         }
 
+        .masterVolume {
+          width: 120px;
+        }
+
         .loopButton {
           width: 76px;
           height: 48px;
@@ -645,17 +838,21 @@
         }
       }
 
-      /* =====================================================
-     VERY SMALL SCREEN
-  ===================================================== */
-
       @media (max-width: 500px) {
         .loopInfo {
           display: none;
         }
 
+        .masterVolume {
+          width: 105px;
+        }
+
         .loopArea {
           gap: 6px;
+        }
+
+        .masterLabel {
+          font-size: 11px;
         }
       }
     </style>
@@ -663,8 +860,8 @@
 
   <body>
     <!-- =====================================================
-     TOOLBAR
-===================================================== -->
+         TOOLBAR
+    ===================================================== -->
 
     <div class="toolbar">
       <button id="editMode" class="modeButton active">EDIT</button>
@@ -681,33 +878,24 @@
 
       <button id="deleteButton">DELETE</button>
 
-      <!-- ===================================================
-       AUDIO FILE INPUT
-
-       IMPORTANT:
-       直接放在 HTML。
-
-       iPad Safari 比動態建立 input 更穩定。
-  ==================================================== -->
-
       <input
         type="file"
         id="audioInput"
         accept="
-      .mp3,
-      .m4a,
-      .wav,
-      .aac,
-      .aiff,
-      .aif,
-      .mp4,
-      audio/mpeg,
-      audio/mp4,
-      audio/wav,
-      audio/x-wav,
-      audio/aac,
-      audio/aiff
-    "
+          .mp3,
+          .m4a,
+          .wav,
+          .aac,
+          .aiff,
+          .aif,
+          .mp4,
+          audio/mpeg,
+          audio/mp4,
+          audio/wav,
+          audio/x-wav,
+          audio/aac,
+          audio/aiff
+        "
         multiple
       />
 
@@ -715,27 +903,36 @@
     </div>
 
     <!-- =====================================================
-     CANVAS
-===================================================== -->
+         CANVAS
+    ===================================================== -->
 
     <div id="canvas">
-      <div class="help">
-        EDIT：點擊選取・拖曳移動・右下角調整大小・Delete 刪除
-      </div>
+      <div class="help">EDIT：單點預覽・雙擊錄音・拖曳移動・右下角調整大小</div>
 
       <div class="loopRecordingIndicator">● RECORDING LOOP</div>
     </div>
 
     <!-- =====================================================
-     LOOP AREA
-
-     注意：
-     放在 body，而不是 canvas 裡。
-
-     這對 iPad fixed positioning 比較穩定。
-===================================================== -->
+         LOOP AREA
+    ===================================================== -->
 
     <div class="loopArea">
+      <div class="masterVolume">
+        <div class="masterHeader">
+          <span class="masterLabel">MASTER</span>
+          <span id="masterVolumeValue" class="masterValue">100%</span>
+        </div>
+
+        <input
+          type="range"
+          id="masterVolumeSlider"
+          min="0"
+          max="1"
+          step="0.01"
+          value="1"
+        />
+      </div>
+
       <button id="loopButton" class="loopButton">LOOP</button>
 
       <button id="resetLoopButton" class="resetLoopButton">RESET LOOP</button>
@@ -751,23 +948,15 @@
 
     <script>
       /* =====================================================
-   SAMPLER STATE
-===================================================== */
+         SAMPLER STATE
+      ===================================================== */
 
       const sampler = {
         mode: "edit",
 
-        /* -------------------------
-     Pads
-  ------------------------- */
-
         pads: [],
 
         selectedPad: null,
-
-        /* -------------------------
-     Images
-  ------------------------- */
 
         images: [],
 
@@ -777,11 +966,11 @@
 
         nextImageId: 1,
 
-        /* -------------------------
-     Audio
-  ------------------------- */
-
         audioContext: null,
+
+        masterGain: null,
+
+        masterVolume: 1,
 
         mediaStream: null,
 
@@ -796,8 +985,8 @@
         recordingStartTime: null,
 
         /* -------------------------
-     Loop
-  ------------------------- */
+           LOOP
+        ------------------------- */
 
         loops: [],
 
@@ -820,11 +1009,15 @@
         cancelLoopRecording: false,
 
         loopEvents: [],
+
+        loopSchedulerTimers: new Map(),
+
+        loopSchedulerGeneration: new Map(),
       };
 
       /* =====================================================
-   DOM
-===================================================== */
+         DOM
+      ===================================================== */
 
       const canvas = document.getElementById("canvas");
 
@@ -852,9 +1045,15 @@
 
       const loopLayers = document.getElementById("loopLayers");
 
+      const loopArea = document.querySelector(".loopArea");
+
+      const masterVolumeSlider = document.getElementById("masterVolumeSlider");
+
+      const masterVolumeValue = document.getElementById("masterVolumeValue");
+
       /* =====================================================
-   SETTINGS
-===================================================== */
+         SETTINGS
+      ===================================================== */
 
       const CLICK_TIME = 250;
 
@@ -869,8 +1068,98 @@
       const MIN_TRIM_DURATION = 0.02;
 
       /* =====================================================
-   PERCENT HELPERS
-===================================================== */
+         TABLET / MOBILE GESTURE LOCK
+      ===================================================== */
+
+      /*
+       * 防止選取文字。
+       */
+      document.addEventListener(
+        "selectstart",
+        (event) => {
+          event.preventDefault();
+        },
+        { passive: false },
+      );
+
+      /*
+       * 防止右鍵 / 長按選單。
+       */
+      document.addEventListener(
+        "contextmenu",
+        (event) => {
+          event.preventDefault();
+        },
+        { passive: false },
+      );
+
+      /*
+       * 防止 iOS Safari gesture zoom。
+       */
+      document.addEventListener(
+        "gesturestart",
+        (event) => {
+          event.preventDefault();
+        },
+        { passive: false },
+      );
+
+      document.addEventListener(
+        "gesturechange",
+        (event) => {
+          event.preventDefault();
+        },
+        { passive: false },
+      );
+
+      document.addEventListener(
+        "gestureend",
+        (event) => {
+          event.preventDefault();
+        },
+        { passive: false },
+      );
+
+      /*
+       * 防止 double-click 的瀏覽器預設行為。
+       */
+      document.addEventListener(
+        "dblclick",
+        (event) => {
+          event.preventDefault();
+        },
+        { passive: false },
+      );
+
+      /*
+       * 防止多指觸控。
+       *
+       * 注意：
+       * range slider 不會走這裡的阻擋邏輯。
+       */
+      document.addEventListener(
+        "touchstart",
+        (event) => {
+          if (event.touches.length > 1) {
+            event.preventDefault();
+          }
+        },
+        { passive: false },
+      );
+
+      document.addEventListener(
+        "touchmove",
+        (event) => {
+          if (event.touches.length > 1) {
+            event.preventDefault();
+          }
+        },
+        { passive: false },
+      );
+
+      /* =====================================================
+         PERCENT HELPERS
+      ===================================================== */
 
       function pxToPercentX(px) {
         return (px / canvas.clientWidth) * 100;
@@ -881,8 +1170,8 @@
       }
 
       /* =====================================================
-   SELECTION
-===================================================== */
+         SELECTION
+      ===================================================== */
 
       function clearSelection() {
         sampler.pads.forEach((pad) => {
@@ -923,8 +1212,8 @@
       }
 
       /* =====================================================
-   AUDIO
-===================================================== */
+         AUDIO
+      ===================================================== */
 
       function initAudio() {
         if (!sampler.audioContext) {
@@ -937,6 +1226,14 @@
 
           sampler.audioContext = new AudioContextClass();
         }
+
+        if (!sampler.masterGain) {
+          sampler.masterGain = sampler.audioContext.createGain();
+
+          sampler.masterGain.gain.value = sampler.masterVolume;
+
+          sampler.masterGain.connect(sampler.audioContext.destination);
+        }
       }
 
       async function resumeAudio() {
@@ -948,17 +1245,46 @@
       }
 
       /* =====================================================
-   RECORDING MIME
-===================================================== */
+         MASTER VOLUME
+      ===================================================== */
+
+      function setMasterVolume(value) {
+        const volume = Math.max(0, Math.min(1, Number(value)));
+
+        sampler.masterVolume = volume;
+
+        masterVolumeSlider.value = volume;
+
+        masterVolumeValue.textContent = Math.round(volume * 100) + "%";
+
+        if (sampler.masterGain && sampler.audioContext) {
+          const now = sampler.audioContext.currentTime;
+
+          sampler.masterGain.gain.cancelScheduledValues(now);
+
+          sampler.masterGain.gain.setTargetAtTime(volume, now, 0.01);
+        }
+      }
+
+      masterVolumeSlider.addEventListener("input", (event) => {
+        event.stopPropagation();
+
+        setMasterVolume(event.target.value);
+      });
+
+      masterVolumeSlider.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+      });
+
+      /* =====================================================
+         RECORDING MIME
+      ===================================================== */
 
       function getRecordingMimeType() {
         const types = [
           "audio/mp4",
-
           "audio/webm;codecs=opus",
-
           "audio/webm",
-
           "audio/ogg;codecs=opus",
         ];
 
@@ -976,8 +1302,8 @@
       }
 
       /* =====================================================
-   AUTO TRIM
-===================================================== */
+         AUTO TRIM
+      ===================================================== */
 
       function trimAudioBuffer(
         audioBuffer,
@@ -1000,10 +1326,6 @@
 
         let startSample = -1;
 
-        /* -------------------------
-     Find start
-  ------------------------- */
-
         for (let i = 0; i < length; i++) {
           let amplitude = 0;
 
@@ -1023,10 +1345,6 @@
         if (startSample === -1) {
           return audioBuffer;
         }
-
-        /* -------------------------
-     Find end
-  ------------------------- */
 
         let endSample = -1;
 
@@ -1049,10 +1367,6 @@
         if (endSample === -1) {
           return audioBuffer;
         }
-
-        /* -------------------------
-     Padding
-  ------------------------- */
 
         const paddingSamples = Math.floor(padding * sampleRate);
 
@@ -1086,20 +1400,15 @@
 
         console.log("Audio trimmed:", {
           originalDuration: audioBuffer.duration,
-
           trimmedDuration: trimmedBuffer.duration,
-
-          removedStart: startSample / sampleRate,
-
-          removedEnd: (length - endSample - 1) / sampleRate,
         });
 
         return trimmedBuffer;
       }
 
       /* =====================================================
-   CREATE PAD
-===================================================== */
+         CREATE PAD
+      ===================================================== */
 
       function createPad(x = 10, y = 10) {
         const id = sampler.nextPadId++;
@@ -1121,11 +1430,43 @@
 
           audioBuffer: null,
 
+          volume: 1,
+
           element: null,
 
           lastTapTime: 0,
 
           pendingDoubleTap: false,
+
+          /*
+           * PLAY MODE 長按播放。
+           *
+           * holdSource = 目前正在 loop 的 source
+           * holdGain   = 這次播放的 volume gain
+           * holding    = 是否正在按住
+           */
+          /*
+           * PLAY MODE 長按重複播放。
+           *
+           * 不使用 source.loop，而是每次重新建立
+           * BufferSource。這樣即使下一次開始時間
+           * 早於上一個音檔結束，也可以自然重疊播放。
+           */
+          holdSource: null,
+
+          holdGain: null,
+
+          holding: false,
+
+          holdPointerId: null,
+
+          holdStartY: 0,
+
+          holdInterval: 600,
+
+          holdTimer: null,
+
+          holdGeneration: 0,
         };
 
         sampler.pads.push(pad);
@@ -1138,38 +1479,22 @@
       }
 
       /* =====================================================
-   IMPORT PAD
-=====================================================
-
-   IMPORTANT iPAD FIX
-
-   使用 HTML 中已存在的 #audioInput。
-*/
+         IMPORT PAD
+      ===================================================== */
 
       importPadButton.addEventListener("click", () => {
         if (sampler.mode !== "edit") {
           return;
         }
 
-        /*
-       清除之前的 value。
-
-       讓 iPad 可以重新選同一個 MP3。
-    */
-
         audioInput.value = "";
-
-        /*
-       iOS Safari / iPadOS
-       直接觸發真正的 file input。
-    */
 
         audioInput.click();
       });
 
       /* =====================================================
-   AUDIO INPUT CHANGE
-===================================================== */
+         AUDIO INPUT
+      ===================================================== */
 
       audioInput.addEventListener("change", async (event) => {
         const files = Array.from(event.target.files || []);
@@ -1178,114 +1503,60 @@
           return;
         }
 
-        console.log(
-          "Import files:",
-          files.map((file) => file.name),
-        );
-
         for (const file of files) {
           await importAudioFileAsPad(file);
         }
-
-        /*
-       非常重要：
-
-       reset input，
-       讓同一個檔案可以再次選取。
-    */
 
         audioInput.value = "";
       });
 
       /* =====================================================
-   IMPORT AUDIO FILE
-===================================================== */
+         IMPORT AUDIO FILE
+      ===================================================== */
 
       async function importAudioFileAsPad(file) {
         if (!file) {
           return;
         }
 
-        console.log("Importing:", file.name, file.type, file.size);
+        let pad = null;
 
         try {
-          /*
-       建立 Pad
-    */
-
-          const pad = createPad(
-            10 + Math.random() * 50,
-
-            10 + Math.random() * 50,
-          );
+          pad = createPad(10 + Math.random() * 50, 10 + Math.random() * 50);
 
           updatePadStatus(pad, "LOADING");
 
-          /*
-       Object URL
-    */
-
           pad.audioURL = URL.createObjectURL(file);
-
-          /*
-       AudioContext
-    */
 
           initAudio();
 
-          /*
-       File → ArrayBuffer
-    */
-
           const arrayBuffer = await file.arrayBuffer();
-
-          /*
-       ArrayBuffer → AudioBuffer
-    */
 
           const decodedBuffer =
             await sampler.audioContext.decodeAudioData(arrayBuffer);
 
-          /*
-       Auto Trim
-    */
-
           pad.audioBuffer = trimAudioBuffer(decodedBuffer);
-
-          /*
-       READY
-    */
 
           updatePadStatus(pad, "READY");
 
           selectPad(pad);
-
-          console.log(
-            "Imported successfully:",
-            file.name,
-            pad.audioBuffer.duration,
-          );
         } catch (error) {
           console.error("Import audio error:", error);
 
-          /*
-       移除失敗 Pad
-    */
-
-          const failedPad = sampler.selectedPad;
-
-          if (failedPad && !failedPad.audioBuffer) {
-            if (failedPad.audioURL) {
-              URL.revokeObjectURL(failedPad.audioURL);
+          if (pad) {
+            if (pad.audioURL) {
+              URL.revokeObjectURL(pad.audioURL);
             }
 
-            if (failedPad.element) {
-              failedPad.element.remove();
+            if (pad.element) {
+              pad.element.remove();
             }
 
-            sampler.pads = sampler.pads.filter((p) => p !== failedPad);
+            sampler.pads = sampler.pads.filter((p) => p !== pad);
 
-            sampler.selectedPad = null;
+            if (sampler.selectedPad === pad) {
+              sampler.selectedPad = null;
+            }
           }
 
           alert(
@@ -1296,8 +1567,8 @@
       }
 
       /* =====================================================
-   RENDER PAD
-===================================================== */
+         RENDER PAD
+      ===================================================== */
 
       function renderPad(pad) {
         const element = document.createElement("div");
@@ -1308,23 +1579,91 @@
 
         content.className = "padContent";
 
-        content.innerHTML = `
+        const name = document.createElement("div");
 
-    <div class="padName">
-      ${pad.name}
-    </div>
+        name.className = "padName";
 
-    <div class="recordStatus">
-      NO SOUND
-    </div>
+        name.textContent = pad.name;
 
-  `;
+        const status = document.createElement("div");
+
+        status.className = "recordStatus";
+
+        status.textContent = "NO SOUND";
+
+        content.appendChild(name);
+
+        content.appendChild(status);
+
+        /* -------------------------
+           PAD volume
+        ------------------------- */
+
+        const controls = document.createElement("div");
+
+        controls.className = "padControls";
+
+        const label = document.createElement("span");
+
+        label.className = "padVolumeLabel";
+
+        label.textContent = "VOL";
+
+        const slider = document.createElement("input");
+
+        slider.type = "range";
+
+        slider.className = "padVolume";
+
+        slider.min = "0";
+
+        slider.max = "1";
+
+        slider.step = "0.01";
+
+        slider.value = pad.volume;
+
+        const value = document.createElement("span");
+
+        value.className = "padVolumeValue";
+
+        value.textContent = Math.round(pad.volume * 100) + "%";
+
+        controls.appendChild(label);
+
+        controls.appendChild(slider);
+
+        controls.appendChild(value);
+
+        controls.addEventListener("pointerdown", (event) => {
+          event.stopPropagation();
+        });
+
+        controls.addEventListener("pointermove", (event) => {
+          event.stopPropagation();
+        });
+
+        controls.addEventListener("pointerup", (event) => {
+          event.stopPropagation();
+        });
+
+        controls.addEventListener("click", (event) => {
+          event.stopPropagation();
+        });
+
+        slider.addEventListener("input", (event) => {
+          event.stopPropagation();
+
+          setPadVolume(pad, event.target.value);
+        });
+
+        element.appendChild(content);
+
+        element.appendChild(controls);
 
         const resizeHandle = document.createElement("div");
 
         resizeHandle.className = "resizeHandle";
-
-        element.appendChild(content);
 
         element.appendChild(resizeHandle);
 
@@ -1338,8 +1677,46 @@
       }
 
       /* =====================================================
-   UPDATE PAD
-===================================================== */
+         PAD VOLUME
+      ===================================================== */
+
+      function setPadVolume(pad, value) {
+        const volume = Math.max(0, Math.min(1, Number(value)));
+
+        pad.volume = volume;
+
+        if (!pad.element) {
+          return;
+        }
+
+        const slider = pad.element.querySelector(".padVolume");
+
+        const valueElement = pad.element.querySelector(".padVolumeValue");
+
+        if (slider) {
+          slider.value = volume;
+        }
+
+        if (valueElement) {
+          valueElement.textContent = Math.round(volume * 100) + "%";
+        }
+
+        /*
+         * 如果正在長按播放，
+         * 音量即時跟著 slider 改。
+         */
+        if (pad.holdGain) {
+          pad.holdGain.gain.setTargetAtTime(
+            volume,
+            sampler.audioContext.currentTime,
+            0.01,
+          );
+        }
+      }
+
+      /* =====================================================
+         UPDATE PAD
+      ===================================================== */
 
       function updatePad(pad) {
         if (!pad.element) {
@@ -1356,8 +1733,8 @@
       }
 
       /* =====================================================
-   RENAME
-===================================================== */
+         RENAME
+      ===================================================== */
 
       function renameSelectedPad() {
         const pad = sampler.selectedPad;
@@ -1392,8 +1769,298 @@
       renamePadButton.addEventListener("click", renameSelectedPad);
 
       /* =====================================================
-   PAD INTERACTION
-===================================================== */
+         PLAY MODE — HOLD PLAY
+      ===================================================== */
+
+      /*
+       * ============================================================
+       * PLAY MODE — HOLD RETRIGGER
+       * ============================================================
+       *
+       * 長按 PAD：
+       *
+       *   1. 第一下立即播放。
+       *   2. 手指繼續按住時，不斷重新觸發同一個 PAD。
+       *   3. 手指往上移 → interval 變短 → 觸發越快。
+       *   4. 手指往下移 → interval 變長 → 觸發越慢。
+       *
+       * 重要：
+       * 這裡刻意不用 AudioBufferSourceNode.loop。
+       * 每一次 retrigger 都建立新的 BufferSource，
+       * 所以「下一次開始」不需要等「上一次結束」。
+       * 因此 interval 小於音檔長度時，聲音會重疊。
+       */
+
+      const HOLD_BASE_INTERVAL = 600;
+
+      const HOLD_MIN_INTERVAL = 70;
+
+      const HOLD_MAX_INTERVAL = 1400;
+
+      /*
+       * 每移動 1px，interval 改變多少毫秒。
+       *
+       * 往上：
+       *   dy < 0
+       *   interval 變短
+       *
+       * 往下：
+       *   dy > 0
+       *   interval 變長
+       */
+      const HOLD_INTERVAL_PER_PIXEL = 4;
+
+      function getHoldIntervalFromY(pad, currentY) {
+        const dy = currentY - pad.holdStartY;
+
+        const interval = HOLD_BASE_INTERVAL + dy * HOLD_INTERVAL_PER_PIXEL;
+
+        return Math.max(
+          HOLD_MIN_INTERVAL,
+          Math.min(HOLD_MAX_INTERVAL, interval),
+        );
+      }
+
+      function updatePadHoldSpeed(pad, currentY) {
+        if (!pad || !pad.holding) {
+          return;
+        }
+
+        const newInterval = getHoldIntervalFromY(pad, currentY);
+
+        pad.holdInterval = newInterval;
+
+        /*
+         * 速度改變後，重新安排下一次 retrigger。
+         *
+         * 不是等舊 timer 跑完，所以滑動速度會立即生效。
+         */
+        scheduleNextPadHold(pad, true);
+      }
+
+      function scheduleNextPadHold(pad, immediateReschedule = false) {
+        if (!pad || !pad.holding) {
+          return;
+        }
+
+        if (!pad.audioBuffer) {
+          return;
+        }
+
+        if (pad.holdTimer !== null) {
+          clearTimeout(pad.holdTimer);
+
+          pad.holdTimer = null;
+        }
+
+        const generation = pad.holdGeneration;
+
+        /*
+         * 用目前 interval 決定下一次開始。
+         *
+         * 如果 interval = 200ms，
+         * 就是每 200ms 開始一次。
+         *
+         * 不管前一個音檔是不是已經播放完。
+         */
+        const delay = immediateReschedule
+          ? Math.max(10, Math.min(pad.holdInterval, 120))
+          : pad.holdInterval;
+
+        pad.holdTimer = setTimeout(() => {
+          pad.holdTimer = null;
+
+          if (!pad.holding) {
+            return;
+          }
+
+          if (pad.holdGeneration !== generation) {
+            return;
+          }
+
+          if (sampler.mode !== "play") {
+            return;
+          }
+
+          /*
+           * 這一次新的播放可以和上一個聲音重疊。
+           */
+          playPad(pad);
+
+          /*
+           * 繼續下一次。
+           */
+          scheduleNextPadHold(pad);
+        }, delay);
+      }
+
+      async function startPadHold(pad, pointerId, startY) {
+        if (sampler.mode !== "play") {
+          return;
+        }
+
+        if (pad.holding) {
+          return;
+        }
+
+        if (!pad.audioBuffer) {
+          return;
+        }
+
+        /*
+         * 先記住 pointer 狀態。
+         *
+         * 因為 resumeAudio() 是 async，
+         * 使用者可能在它完成前就放手。
+         */
+        pad.holdPointerId = pointerId;
+
+        pad.holdStartY = startY;
+
+        pad.holdInterval = HOLD_BASE_INTERVAL;
+
+        pad.holdGeneration++;
+
+        const generation = pad.holdGeneration;
+
+        try {
+          await resumeAudio();
+        } catch (error) {
+          console.error("Cannot resume audio:", error);
+
+          pad.holdPointerId = null;
+
+          return;
+        }
+
+        /*
+         * 如果使用者已經放開，或 mode 已經切換，
+         * 就不要開始長按播放。
+         */
+        if (sampler.mode !== "play") {
+          pad.holdPointerId = null;
+
+          return;
+        }
+
+        if (pad.holdGeneration !== generation) {
+          pad.holdPointerId = null;
+
+          return;
+        }
+
+        if (pad.holdPointerId !== pointerId) {
+          return;
+        }
+
+        pad.holding = true;
+
+        /*
+         * 第一下立即播放。
+         */
+        playPad(pad);
+
+        if (pad.element) {
+          pad.element.classList.add("holding");
+        }
+
+        updatePadHoldSpeedUI(pad);
+
+        /*
+         * 開始 retrigger。
+         */
+        scheduleNextPadHold(pad);
+      }
+
+      /* =====================================================
+         PLAY MODE — RELEASE PAD
+      ===================================================== */
+
+      function stopPadHold(pad, pointerId = null) {
+        if (!pad) {
+          return;
+        }
+
+        /*
+         * 如果指定 pointerId，
+         * 只有目前這根手指可以停止它。
+         */
+        if (
+          pointerId !== null &&
+          pad.holdPointerId !== null &&
+          pad.holdPointerId !== pointerId
+        ) {
+          return;
+        }
+
+        pad.holding = false;
+
+        pad.holdPointerId = null;
+
+        pad.holdGeneration++;
+
+        if (pad.holdTimer !== null) {
+          clearTimeout(pad.holdTimer);
+
+          pad.holdTimer = null;
+        }
+
+        /*
+         * holdSource 保留作為相容欄位。
+         * 新版 retrigger 不依賴單一 loop source。
+         */
+        const source = pad.holdSource;
+
+        const gain = pad.holdGain;
+
+        pad.holdSource = null;
+
+        pad.holdGain = null;
+
+        if (source) {
+          try {
+            source.stop();
+          } catch (error) {}
+
+          try {
+            source.disconnect();
+          } catch (error) {}
+        }
+
+        if (gain) {
+          try {
+            gain.disconnect();
+          } catch (error) {}
+        }
+
+        if (pad.element) {
+          pad.element.classList.remove("holding");
+
+          /*
+           * 這裡只移除 hold 的視覺狀態。
+           *
+           * playPad() 自己建立的短暫 source
+           * 會在 onended 時自行清理。
+           */
+          if (!pad.holding) {
+            pad.element.classList.remove("playing");
+          }
+        }
+      }
+
+      /* =====================================================
+         STOP ALL PAD HOLDS
+      ===================================================== */
+
+      function stopAllPadHolds() {
+        sampler.pads.forEach((pad) => {
+          stopPadHold(pad);
+        });
+      }
+
+      /* =====================================================
+         PAD INTERACTION
+      ===================================================== */
 
       function setupPadInteraction(pad, element, resizeHandle) {
         let startX = 0;
@@ -1414,155 +2081,292 @@
 
         let action = null;
 
-        element.addEventListener("pointerdown", (event) => {
-          if (sampler.mode !== "edit") {
-            return;
-          }
+        element.addEventListener(
+          "pointerdown",
+          async (event) => {
+            /*
+             * =================================================
+             * PLAY MODE
+             * =================================================
+             *
+             * 長按 PAD：
+             *
+             *   第一聲立即播放。
+             *
+             *   手指往上移：
+             *     retrigger interval 變短
+             *     → 播放越來越快。
+             *
+             *   手指往下移：
+             *     retrigger interval 變長
+             *     → 播放越來越慢。
+             *
+             * 注意：
+             * 每一次都是新的 BufferSource，
+             * 所以不需要等待上一個音檔播完。
+             */
+            if (sampler.mode === "play") {
+              if (event.target.closest(".padControls")) {
+                return;
+              }
 
-          event.preventDefault();
+              event.preventDefault();
 
-          try {
-            element.setPointerCapture(event.pointerId);
-          } catch (error) {}
+              try {
+                element.setPointerCapture(event.pointerId);
+              } catch (error) {}
 
-          startX = event.clientX;
+              /*
+               * 一次 pointerdown = 一次 loop event。
+               *
+               * 長按期間的 retrigger 不會一直
+               * 重複寫入 Loop 錄音事件。
+               */
+              recordPadEvent(pad);
 
-          startY = event.clientY;
+              await startPadHold(pad, event.pointerId, event.clientY);
 
-          startPadX = pad.x;
+              return;
+            }
 
-          startPadY = pad.y;
+            /*
+             * EDIT MODE
+             */
+            if (sampler.mode !== "edit") {
+              return;
+            }
 
-          startWidth = pad.width;
+            if (event.target.closest(".padControls")) {
+              return;
+            }
 
-          startHeight = pad.height;
+            event.preventDefault();
 
-          pointerDownTime = Date.now();
+            try {
+              element.setPointerCapture(event.pointerId);
+            } catch (error) {}
 
-          moved = false;
+            startX = event.clientX;
 
-          if (event.target === resizeHandle) {
-            action = "resize";
+            startY = event.clientY;
 
-            selectPad(pad);
+            startPadX = pad.x;
 
-            return;
-          }
+            startPadY = pad.y;
 
-          action = "none";
+            startWidth = pad.width;
 
-          if (sampler.recordingPad === pad) {
-            selectPad(pad);
+            startHeight = pad.height;
 
-            return;
-          }
+            pointerDownTime = Date.now();
 
-          const now = Date.now();
+            moved = false;
 
-          const timeSinceLastTap = now - pad.lastTapTime;
+            if (event.target === resizeHandle) {
+              action = "resize";
 
-          if (pad.lastTapTime > 0 && timeSinceLastTap < DOUBLE_TAP_TIME) {
-            pad.lastTapTime = 0;
+              selectPad(pad);
 
-            pad.pendingDoubleTap = true;
+              return;
+            }
 
-            startRecording(pad);
-          } else {
-            pad.lastTapTime = now;
+            action = "none";
+
+            if (sampler.recordingPad === pad) {
+              selectPad(pad);
+
+              return;
+            }
+
+            const now = Date.now();
+
+            const timeSinceLastTap = now - pad.lastTapTime;
+
+            /*
+             * 第二次點擊：
+             * 啟動錄音。
+             */
+            if (pad.lastTapTime > 0 && timeSinceLastTap < DOUBLE_TAP_TIME) {
+              pad.lastTapTime = 0;
+
+              pad.pendingDoubleTap = true;
+
+              startRecording(pad);
+            } else {
+              /*
+               * 第一次點擊：
+               * 選取 + 預覽。
+               */
+              pad.lastTapTime = now;
+
+              pad.pendingDoubleTap = false;
+
+              selectPad(pad);
+
+              playPad(pad);
+            }
+          },
+          { passive: false },
+        );
+
+        element.addEventListener(
+          "pointermove",
+          (event) => {
+            /*
+             * PLAY MODE：
+             *
+             * 不拖曳 PAD。
+             *
+             * Y 軸移動用來控制 retrigger speed。
+             */
+            if (sampler.mode === "play") {
+              event.preventDefault();
+
+              if (pad.holding && pad.holdPointerId === event.pointerId) {
+                updatePadHoldSpeed(pad, event.clientY);
+              }
+
+              return;
+            }
+
+            if (sampler.mode !== "edit") {
+              return;
+            }
+
+            if (action === null) {
+              return;
+            }
+
+            if (sampler.recordingPad === pad) {
+              return;
+            }
+
+            const dx = event.clientX - startX;
+
+            const dy = event.clientY - startY;
+
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (action === "resize") {
+              moved = true;
+
+              pad.width = Math.max(3, startWidth + pxToPercentX(dx));
+
+              pad.height = Math.max(3, startHeight + pxToPercentY(dy));
+
+              updatePad(pad);
+
+              return;
+            }
+
+            if (distance > DRAG_THRESHOLD) {
+              moved = true;
+
+              action = "drag";
+
+              pad.lastTapTime = 0;
+
+              pad.x = startPadX + pxToPercentX(dx);
+
+              pad.y = startPadY + pxToPercentY(dy);
+
+              updatePad(pad);
+            }
+          },
+          { passive: false },
+        );
+
+        element.addEventListener(
+          "pointerup",
+          (event) => {
+            /*
+             * PLAY MODE：
+             * 放開就停止 retrigger。
+             */
+            if (sampler.mode === "play") {
+              event.preventDefault();
+
+              stopPadHold(pad, event.pointerId);
+
+              try {
+                element.releasePointerCapture(event.pointerId);
+              } catch (error) {}
+
+              return;
+            }
+
+            if (sampler.mode !== "edit") {
+              return;
+            }
+
+            if (moved) {
+              action = null;
+
+              return;
+            }
+
+            if (sampler.recordingPad === pad && !pad.pendingDoubleTap) {
+              stopRecording();
+
+              action = null;
+
+              return;
+            }
+
+            if (pad.pendingDoubleTap) {
+              pad.pendingDoubleTap = false;
+
+              action = null;
+
+              return;
+            }
+
+            const duration = Date.now() - pointerDownTime;
+
+            if (duration >= CLICK_TIME) {
+              pad.lastTapTime = 0;
+
+              action = null;
+
+              return;
+            }
+
+            action = null;
+          },
+          { passive: false },
+        );
+
+        element.addEventListener(
+          "pointercancel",
+          (event) => {
+            if (sampler.mode === "play") {
+              event.preventDefault();
+
+              stopPadHold(pad, event.pointerId);
+
+              return;
+            }
+
+            action = null;
 
             pad.pendingDoubleTap = false;
+          },
+          { passive: false },
+        );
 
-            selectPad(pad);
-          }
-        });
-
-        element.addEventListener("pointermove", (event) => {
-          if (sampler.mode !== "edit") {
-            return;
-          }
-
-          if (action === null) {
-            return;
-          }
-
-          if (sampler.recordingPad === pad) {
-            return;
-          }
-
-          const dx = event.clientX - startX;
-
-          const dy = event.clientY - startY;
-
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (action === "resize") {
-            moved = true;
-
-            pad.width = Math.max(3, startWidth + pxToPercentX(dx));
-
-            pad.height = Math.max(3, startHeight + pxToPercentY(dy));
-
-            updatePad(pad);
+        /*
+         * iPad Safari / pointer capture 特別重要。
+         *
+         * 如果手指滑出 PAD 後 Safari 發生
+         * lostpointercapture，也必須停止聲音。
+         */
+        element.addEventListener("lostpointercapture", () => {
+          if (sampler.mode === "play") {
+            stopPadHold(pad);
 
             return;
           }
 
-          if (distance > DRAG_THRESHOLD) {
-            moved = true;
-
-            action = "drag";
-
-            pad.lastTapTime = 0;
-
-            pad.x = startPadX + pxToPercentX(dx);
-
-            pad.y = startPadY + pxToPercentY(dy);
-
-            updatePad(pad);
-          }
-        });
-
-        element.addEventListener("pointerup", () => {
-          if (sampler.mode !== "edit") {
-            return;
-          }
-
-          if (moved) {
-            action = null;
-
-            return;
-          }
-
-          if (sampler.recordingPad === pad && !pad.pendingDoubleTap) {
-            stopRecording();
-
-            action = null;
-
-            return;
-          }
-
-          if (pad.pendingDoubleTap) {
-            pad.pendingDoubleTap = false;
-
-            action = null;
-
-            return;
-          }
-
-          const duration = Date.now() - pointerDownTime;
-
-          if (duration >= CLICK_TIME) {
-            pad.lastTapTime = 0;
-
-            action = null;
-
-            return;
-          }
-
-          action = null;
-        });
-
-        element.addEventListener("pointercancel", () => {
           action = null;
 
           pad.pendingDoubleTap = false;
@@ -1570,10 +2374,14 @@
       }
 
       /* =====================================================
-   IMAGE
-===================================================== */
+         IMAGE
+      ===================================================== */
 
       addImageButton.addEventListener("click", () => {
+        if (sampler.mode !== "edit") {
+          return;
+        }
+
         imageInput.value = "";
 
         imageInput.click();
@@ -1672,8 +2480,8 @@
       }
 
       /* =====================================================
-   IMAGE INTERACTION
-===================================================== */
+         IMAGE INTERACTION
+      ===================================================== */
 
       function setupImageInteraction(image, element, resizeHandle) {
         let startX;
@@ -1690,78 +2498,98 @@
 
         let action = null;
 
-        element.addEventListener("pointerdown", (event) => {
-          if (sampler.mode !== "edit") {
-            return;
-          }
+        element.addEventListener(
+          "pointerdown",
+          (event) => {
+            if (sampler.mode !== "edit") {
+              return;
+            }
 
-          event.preventDefault();
+            event.preventDefault();
 
-          try {
-            element.setPointerCapture(event.pointerId);
-          } catch (error) {}
+            try {
+              element.setPointerCapture(event.pointerId);
+            } catch (error) {}
 
-          selectImage(image);
+            selectImage(image);
 
-          startX = event.clientX;
+            startX = event.clientX;
 
-          startY = event.clientY;
+            startY = event.clientY;
 
-          startImageX = image.x;
+            startImageX = image.x;
 
-          startImageY = image.y;
+            startImageY = image.y;
 
-          startWidth = image.width;
+            startWidth = image.width;
 
-          startHeight = image.height;
+            startHeight = image.height;
 
-          if (event.target === resizeHandle) {
-            action = "resize";
-          } else {
-            action = "drag";
-          }
-        });
+            if (event.target === resizeHandle) {
+              action = "resize";
+            } else {
+              action = "drag";
+            }
+          },
+          { passive: false },
+        );
 
-        element.addEventListener("pointermove", (event) => {
-          if (sampler.mode !== "edit") {
-            return;
-          }
+        element.addEventListener(
+          "pointermove",
+          (event) => {
+            if (sampler.mode !== "edit") {
+              return;
+            }
 
-          if (!action) {
-            return;
-          }
+            if (!action) {
+              return;
+            }
 
-          const dx = event.clientX - startX;
+            event.preventDefault();
 
-          const dy = event.clientY - startY;
+            const dx = event.clientX - startX;
 
-          if (action === "drag") {
-            image.x = startImageX + pxToPercentX(dx);
+            const dy = event.clientY - startY;
 
-            image.y = startImageY + pxToPercentY(dy);
-          }
+            if (action === "drag") {
+              image.x = startImageX + pxToPercentX(dx);
 
-          if (action === "resize") {
-            image.width = Math.max(3, startWidth + pxToPercentX(dx));
+              image.y = startImageY + pxToPercentY(dy);
+            }
 
-            image.height = Math.max(3, startHeight + pxToPercentY(dy));
-          }
+            if (action === "resize") {
+              image.width = Math.max(3, startWidth + pxToPercentX(dx));
 
-          updateImage(image);
-        });
+              image.height = Math.max(3, startHeight + pxToPercentY(dy));
+            }
+
+            updateImage(image);
+          },
+          { passive: false },
+        );
 
         element.addEventListener("pointerup", () => {
+          action = null;
+        });
+
+        element.addEventListener("pointercancel", () => {
+          action = null;
+        });
+
+        element.addEventListener("lostpointercapture", () => {
           action = null;
         });
       }
 
       /* =====================================================
-   DELETE
-===================================================== */
+         DELETE
+      ===================================================== */
 
       function deleteSelected() {
         if (sampler.selectedPad) {
           const pad = sampler.selectedPad;
+
+          stopPadHold(pad);
 
           if (sampler.recordingPad === pad) {
             stopRecording();
@@ -1802,8 +2630,8 @@
       deleteButton.addEventListener("click", deleteSelected);
 
       /* =====================================================
-   DELETE KEY
-===================================================== */
+         DELETE KEY
+      ===================================================== */
 
       document.addEventListener("keydown", (event) => {
         if (sampler.mode !== "edit") {
@@ -1826,8 +2654,8 @@
       });
 
       /* =====================================================
-   PAD RECORDING
-===================================================== */
+         PAD RECORDING
+      ===================================================== */
 
       async function startRecording(pad) {
         if (sampler.recordingPad) {
@@ -1983,6 +2811,20 @@
         }
       }
 
+      function updatePadHoldSpeedUI(pad) {
+        const element = pad.element?.querySelector(".recordStatus");
+
+        if (!element) {
+          return;
+        }
+
+        if (!pad.holding) {
+          return;
+        }
+
+        element.textContent = `RETRIGGER ${Math.round(pad.holdInterval)}ms`;
+      }
+
       function updateRecordingText(pad, text) {
         const element = pad.element?.querySelector(".recordStatus");
 
@@ -1992,8 +2834,8 @@
       }
 
       /* =====================================================
-   PLAY PAD
-===================================================== */
+         PLAY PAD — NORMAL PREVIEW
+      ===================================================== */
 
       function playPad(pad, options = {}) {
         if (!pad.audioBuffer) {
@@ -2006,11 +2848,17 @@
           sampler.audioContext.resume();
         }
 
+        const padGain = sampler.audioContext.createGain();
+
+        padGain.gain.value = pad.volume;
+
+        padGain.connect(sampler.masterGain);
+
         const source = sampler.audioContext.createBufferSource();
 
         source.buffer = pad.audioBuffer;
 
-        source.connect(sampler.audioContext.destination);
+        source.connect(padGain);
 
         const startTime =
           options.startTime !== undefined
@@ -2025,16 +2873,30 @@
 
         source.onended = () => {
           if (pad.element) {
-            pad.element.classList.remove("playing");
+            /*
+             * 如果此時不是 hold，
+             * 才移除 playing。
+             */
+            if (!pad.holding) {
+              pad.element.classList.remove("playing");
+            }
           }
+
+          try {
+            source.disconnect();
+          } catch (error) {}
+
+          try {
+            padGain.disconnect();
+          } catch (error) {}
         };
 
         return source;
       }
 
       /* =====================================================
-   LOOP EVENT RECORDING
-===================================================== */
+         LOOP EVENT RECORDING
+      ===================================================== */
 
       async function startLoopRecording() {
         if (sampler.loopRecording) {
@@ -2069,8 +2931,8 @@
       }
 
       /* =====================================================
-   RECORD PAD EVENT
-===================================================== */
+         RECORD PAD EVENT
+      ===================================================== */
 
       function recordPadEvent(pad) {
         if (!sampler.loopRecording) {
@@ -2087,14 +2949,13 @@
 
         sampler.loopEvents.push({
           pad: pad,
-
           time: Math.max(0, time),
         });
       }
 
       /* =====================================================
-   STOP LOOP RECORDING
-===================================================== */
+         STOP LOOP RECORDING
+      ===================================================== */
 
       function stopLoopRecording() {
         if (!sampler.loopRecording) {
@@ -2114,6 +2975,8 @@
 
           sampler.loopEvents = [];
 
+          sampler.loopRecordingStartTime = null;
+
           return;
         }
 
@@ -2121,17 +2984,28 @@
       }
 
       /* =====================================================
-   FINISH LOOP
-===================================================== */
+         FINISH LOOP
+      ===================================================== */
 
       function finishLoopRecording() {
-        const events = [...sampler.loopEvents];
+        const events = sampler.loopEvents.map((event) => ({
+          pad: event.pad,
+          time: event.time,
+        }));
 
-        sampler.loopEvents = [];
+        const recordingStart = sampler.loopRecordingStartTime;
 
         const recordingEndTime = sampler.audioContext.currentTime;
 
-        let duration = recordingEndTime - sampler.loopRecordingStartTime;
+        sampler.loopEvents = [];
+
+        sampler.loopRecordingStartTime = null;
+
+        if (recordingStart === null) {
+          return;
+        }
+
+        let duration = recordingEndTime - recordingStart;
 
         duration = Math.max(0.05, duration);
 
@@ -2149,7 +3023,9 @@
           return;
         }
 
-        const validEvents = events.filter((event) => event.time < duration);
+        const validEvents = events.filter(
+          (event) => event.time >= 0 && event.time < duration,
+        );
 
         if (!validEvents.length) {
           console.warn("Loop contains no valid Pad events.");
@@ -2169,24 +3045,92 @@
           scheduledSources: [],
 
           gain: null,
+
+          schedulerTimer: null,
+
+          schedulerGeneration: 0,
+
+          schedulerActive: false,
+
+          startTime: null,
         };
 
         sampler.loops.push(loop);
 
         renderLoopLayers();
 
-        restartAllLoops();
+        startLoopScheduler(loop);
       }
 
       /* =====================================================
-   STOP LOOP SOURCES
-===================================================== */
+         STOP ONE LOOP
+      ===================================================== */
+
+      function stopLoopScheduler(loop) {
+        if (!loop) {
+          return;
+        }
+
+        loop.schedulerGeneration++;
+
+        loop.schedulerActive = false;
+
+        if (loop.schedulerTimer !== null) {
+          clearTimeout(loop.schedulerTimer);
+
+          loop.schedulerTimer = null;
+        }
+
+        if (loop.scheduledSources && loop.scheduledSources.length) {
+          loop.scheduledSources.forEach((source) => {
+            try {
+              source.onended = null;
+            } catch (error) {}
+
+            try {
+              source.stop();
+            } catch (error) {}
+
+            try {
+              source.disconnect();
+            } catch (error) {}
+
+            const index = sampler.loopSources.indexOf(source);
+
+            if (index !== -1) {
+              sampler.loopSources.splice(index, 1);
+            }
+          });
+        }
+
+        loop.scheduledSources = [];
+
+        if (loop.gain) {
+          try {
+            loop.gain.disconnect();
+          } catch (error) {}
+        }
+
+        loop.gain = null;
+
+        loop.startTime = null;
+      }
+
+      /* =====================================================
+         STOP ALL LOOP SOURCES
+      ===================================================== */
 
       function stopAllLoopSources() {
+        sampler.loops.forEach((loop) => {
+          stopLoopScheduler(loop);
+        });
+
         sampler.loopSources.forEach((source) => {
           try {
             source.onended = null;
+          } catch (error) {}
 
+          try {
             source.stop();
           } catch (error) {}
 
@@ -2196,20 +3140,22 @@
         });
 
         sampler.loopSources = [];
-
-        sampler.loops.forEach((loop) => {
-          loop.scheduledSources = [];
-
-          loop.gain = null;
-        });
       }
 
       /* =====================================================
-   START ALL LOOP SOURCES
-===================================================== */
+         START ONE LOOP
+      ===================================================== */
 
-      function restartAllLoops() {
-        if (!sampler.loops.length) {
+      function startLoopScheduler(loop) {
+        if (!loop) {
+          return;
+        }
+
+        if (!sampler.loops.includes(loop)) {
+          return;
+        }
+
+        if (!loop.events.length) {
           return;
         }
 
@@ -2219,33 +3165,50 @@
           sampler.audioContext.resume();
         }
 
-        stopAllLoopSources();
+        if (loop.schedulerActive) {
+          return;
+        }
 
-        const startTime = sampler.audioContext.currentTime + 0.05;
+        loop.schedulerGeneration++;
 
-        sampler.loops.forEach((loop) => {
-          if (!loop.events.length) {
-            return;
-          }
+        const generation = loop.schedulerGeneration;
 
-          const gain = sampler.audioContext.createGain();
+        loop.schedulerActive = true;
 
-          gain.gain.setValueAtTime(loop.muted ? 0 : 1, startTime);
+        const gain = sampler.audioContext.createGain();
 
-          gain.connect(sampler.audioContext.destination);
+        gain.gain.setValueAtTime(
+          loop.muted ? 0 : 1,
+          sampler.audioContext.currentTime,
+        );
 
-          loop.gain = gain;
+        gain.connect(sampler.masterGain);
 
-          scheduleLoopCycle(loop, startTime);
-        });
+        loop.gain = gain;
+
+        loop.startTime = sampler.audioContext.currentTime + 0.05;
+
+        scheduleLoopCycle(loop, loop.startTime, generation);
       }
 
       /* =====================================================
-   LOOP SCHEDULER
-===================================================== */
+         LOOP CYCLE
+      ===================================================== */
 
-      function scheduleLoopCycle(loop, cycleStartTime) {
+      function scheduleLoopCycle(loop, cycleStartTime, generation) {
+        if (!loop.schedulerActive) {
+          return;
+        }
+
+        if (loop.schedulerGeneration !== generation) {
+          return;
+        }
+
         if (!sampler.loops.includes(loop)) {
+          return;
+        }
+
+        if (sampler.mode !== "play") {
           return;
         }
 
@@ -2253,8 +3216,12 @@
           return;
         }
 
+        if (!loop.gain) {
+          return;
+        }
+
         loop.events.forEach((event) => {
-          if (!event.pad?.audioBuffer) {
+          if (!event.pad || !event.pad.audioBuffer) {
             return;
           }
 
@@ -2262,9 +3229,27 @@
 
           source.buffer = event.pad.audioBuffer;
 
-          source.connect(loop.gain);
+          const padGain = sampler.audioContext.createGain();
+
+          padGain.gain.value = event.pad.volume;
+
+          padGain.connect(loop.gain);
+
+          source.connect(padGain);
 
           const startTime = cycleStartTime + event.time;
+
+          if (startTime < sampler.audioContext.currentTime) {
+            try {
+              source.disconnect();
+            } catch (error) {}
+
+            try {
+              padGain.disconnect();
+            } catch (error) {}
+
+            return;
+          }
 
           source.start(startTime);
 
@@ -2273,28 +3258,46 @@
           loop.scheduledSources.push(source);
 
           source.onended = () => {
-            const index = sampler.loopSources.indexOf(source);
+            const globalIndex = sampler.loopSources.indexOf(source);
 
-            if (index !== -1) {
-              sampler.loopSources.splice(index, 1);
+            if (globalIndex !== -1) {
+              sampler.loopSources.splice(globalIndex, 1);
             }
 
-            const scheduledIndex = loop.scheduledSources.indexOf(source);
+            const loopIndex = loop.scheduledSources.indexOf(source);
 
-            if (scheduledIndex !== -1) {
-              loop.scheduledSources.splice(scheduledIndex, 1);
+            if (loopIndex !== -1) {
+              loop.scheduledSources.splice(loopIndex, 1);
             }
+
+            try {
+              source.disconnect();
+            } catch (error) {}
+
+            try {
+              padGain.disconnect();
+            } catch (error) {}
           };
         });
 
         const nextCycle = cycleStartTime + loop.duration;
 
         const delay = Math.max(
-          0,
-          (nextCycle - sampler.audioContext.currentTime - 0.1) * 1000,
+          10,
+          (nextCycle - sampler.audioContext.currentTime - 0.05) * 1000,
         );
 
-        setTimeout(() => {
+        loop.schedulerTimer = setTimeout(() => {
+          loop.schedulerTimer = null;
+
+          if (!loop.schedulerActive) {
+            return;
+          }
+
+          if (loop.schedulerGeneration !== generation) {
+            return;
+          }
+
           if (!sampler.loops.includes(loop)) {
             return;
           }
@@ -2303,13 +3306,29 @@
             return;
           }
 
-          scheduleLoopCycle(loop, nextCycle);
+          scheduleLoopCycle(loop, nextCycle, generation);
         }, delay);
       }
 
       /* =====================================================
-   LOOP LAYERS
-===================================================== */
+         LEGACY COMPATIBILITY
+      ===================================================== */
+
+      function restartAllLoops() {
+        if (!sampler.loops.length) {
+          return;
+        }
+
+        stopAllLoopSources();
+
+        sampler.loops.forEach((loop) => {
+          startLoopScheduler(loop);
+        });
+      }
+
+      /* =====================================================
+         LOOP LAYERS
+      ===================================================== */
 
       function renderLoopLayers() {
         loopLayers.innerHTML = "";
@@ -2360,8 +3379,8 @@
       }
 
       /* =====================================================
-   MUTE
-===================================================== */
+         MUTE
+      ===================================================== */
 
       function toggleLoopMute(loop) {
         loop.muted = !loop.muted;
@@ -2378,8 +3397,8 @@
       }
 
       /* =====================================================
-   LOOP DURATION UI
-===================================================== */
+         LOOP DURATION UI
+      ===================================================== */
 
       function updateLoopDurationUI() {
         const element = document.querySelector(".loopDuration");
@@ -2394,8 +3413,8 @@
       }
 
       /* =====================================================
-   RESET LOOP
-===================================================== */
+         RESET LOOP
+      ===================================================== */
 
       function resetLoops() {
         stopAllLoopSources();
@@ -2420,6 +3439,10 @@
 
         sampler.cancelLoopRecording = false;
 
+        sampler.loopSchedulerTimers.clear();
+
+        sampler.loopSchedulerGeneration.clear();
+
         loopButton.classList.remove("recording");
 
         loopButton.textContent = "LOOP";
@@ -2440,48 +3463,56 @@
       });
 
       /* =====================================================
-   LOOP BUTTON — POINTER DOWN
-===================================================== */
+         LOOP BUTTON — POINTER DOWN
+      ===================================================== */
 
-      loopButton.addEventListener("pointerdown", async (event) => {
-        if (sampler.mode !== "play") {
-          return;
-        }
+      loopButton.addEventListener(
+        "pointerdown",
+        async (event) => {
+          if (sampler.mode !== "play") {
+            return;
+          }
 
-        event.preventDefault();
+          event.preventDefault();
 
-        try {
-          loopButton.setPointerCapture(event.pointerId);
-        } catch (error) {}
+          try {
+            loopButton.setPointerCapture(event.pointerId);
+          } catch (error) {}
 
-        sampler.loopPressing = true;
+          sampler.loopPressing = true;
 
-        sampler.loopRecordingPointerId = event.pointerId;
+          sampler.loopRecordingPointerId = event.pointerId;
 
-        await startLoopRecording();
-      });
-
-      /* =====================================================
-   LOOP BUTTON — POINTER UP
-===================================================== */
-
-      loopButton.addEventListener("pointerup", (event) => {
-        if (sampler.loopRecordingPointerId !== event.pointerId) {
-          return;
-        }
-
-        event.preventDefault();
-
-        sampler.loopPressing = false;
-
-        sampler.loopRecordingPointerId = null;
-
-        stopLoopRecording();
-      });
+          await startLoopRecording();
+        },
+        { passive: false },
+      );
 
       /* =====================================================
-   POINTER CANCEL
-===================================================== */
+         LOOP BUTTON — POINTER UP
+      ===================================================== */
+
+      loopButton.addEventListener(
+        "pointerup",
+        (event) => {
+          if (sampler.loopRecordingPointerId !== event.pointerId) {
+            return;
+          }
+
+          event.preventDefault();
+
+          sampler.loopPressing = false;
+
+          sampler.loopRecordingPointerId = null;
+
+          stopLoopRecording();
+        },
+        { passive: false },
+      );
+
+      /* =====================================================
+         POINTER CANCEL
+      ===================================================== */
 
       loopButton.addEventListener("pointercancel", () => {
         sampler.loopPressing = false;
@@ -2492,8 +3523,8 @@
       });
 
       /* =====================================================
-   LOST POINTER CAPTURE
-===================================================== */
+         LOST POINTER CAPTURE
+      ===================================================== */
 
       loopButton.addEventListener("lostpointercapture", () => {
         if (sampler.loopPressing) {
@@ -2504,8 +3535,8 @@
       });
 
       /* =====================================================
-   SPACE
-===================================================== */
+         SPACE
+      ===================================================== */
 
       document.addEventListener("keydown", (event) => {
         if (sampler.mode !== "play") {
@@ -2542,46 +3573,10 @@
       });
 
       /* =====================================================
-   PLAY MODE PAD
-===================================================== */
+         PLAY MODE
+      ===================================================== */
 
-      canvas.addEventListener("pointerdown", (event) => {
-        if (sampler.mode !== "play") {
-          return;
-        }
-
-        /*
-       Loop bar 現在是在 body，
-       不在 canvas 裡。
-
-       所以這個判斷仍然保留，
-       但實際上不會攔截 Loop。
-    */
-
-        if (event.target.closest(".loopArea")) {
-          return;
-        }
-
-        const padElement = event.target.closest(".pad");
-
-        if (!padElement) {
-          return;
-        }
-
-        const pad = sampler.pads.find((p) => p.element === padElement);
-
-        if (pad) {
-          playPad(pad);
-
-          recordPadEvent(pad);
-        }
-      });
-
-      /* =====================================================
-   PLAY MODE
-===================================================== */
-
-      function enablePlayMode() {
+      async function enablePlayMode() {
         if (sampler.recordingPad) {
           stopRecording();
         }
@@ -2606,41 +3601,35 @@
 
         deleteButton.style.display = "none";
 
-        /*
-     Loop Area 現在由 CSS：
-
-       #canvas.playMode .loopArea
-
-     控制顯示。
-
-     因為 loopArea 在 body，
-     所以不能再靠 #canvas.playMode。
-
-     這裡直接加 class 到 body。
-  */
-
         document.body.classList.add("playMode");
 
-        /*
-     直接強制顯示。
+        loopArea.style.display = "flex";
 
-     這是 iPad Safari 的保險。
-  */
+        try {
+          await resumeAudio();
 
-        document.querySelector(".loopArea").style.display = "flex";
+          setMasterVolume(sampler.masterVolume);
 
-        if (sampler.loops.length > 0) {
-          resumeAudio().then(() => {
-            restartAllLoops();
-          });
+          if (sampler.loops.length > 0) {
+            sampler.loops.forEach((loop) => {
+              startLoopScheduler(loop);
+            });
+          }
+        } catch (error) {
+          console.error(error);
         }
       }
 
       /* =====================================================
-   EDIT MODE
-===================================================== */
+         EDIT MODE
+      ===================================================== */
 
       function enableEditMode() {
+        /*
+         * 先停止所有長按 Pad。
+         */
+        stopAllPadHolds();
+
         if (sampler.loopRecording) {
           sampler.cancelLoopRecording = true;
 
@@ -2667,11 +3656,7 @@
 
         loopButton.textContent = "LOOP";
 
-        /*
-     Hide Loop Area
-  */
-
-        document.querySelector(".loopArea").style.display = "none";
+        loopArea.style.display = "none";
 
         editModeButton.classList.add("active");
 
@@ -2689,28 +3674,28 @@
       }
 
       /* =====================================================
-   MODE BUTTONS
-===================================================== */
+         MODE BUTTONS
+      ===================================================== */
 
       editModeButton.addEventListener("click", enableEditMode);
 
       playModeButton.addEventListener("click", enablePlayMode);
 
       /* =====================================================
-   ADD PAD
-===================================================== */
+         ADD PAD
+      ===================================================== */
 
       addPadButton.addEventListener("click", () => {
-        createPad(
-          10 + Math.random() * 50,
+        if (sampler.mode !== "edit") {
+          return;
+        }
 
-          10 + Math.random() * 50,
-        );
+        createPad(10 + Math.random() * 50, 10 + Math.random() * 50);
       });
 
       /* =====================================================
-   WINDOW RESIZE
-===================================================== */
+         WINDOW RESIZE
+      ===================================================== */
 
       window.addEventListener("resize", () => {
         sampler.pads.forEach(updatePad);
@@ -2719,20 +3704,64 @@
       });
 
       /* =====================================================
-   INITIAL PADS
-===================================================== */
+         PAGE VISIBILITY
+      ===================================================== */
+
+      document.addEventListener("visibilitychange", () => {
+        /*
+         * 離開頁面時：
+         * 長按 PAD 一定要停止。
+         */
+        if (document.hidden) {
+          stopAllPadHolds();
+
+          if (sampler.mode === "play") {
+            stopAllLoopSources();
+          }
+        }
+
+        if (
+          !document.hidden &&
+          sampler.mode === "play" &&
+          sampler.loops.length > 0
+        ) {
+          resumeAudio().then(() => {
+            sampler.loops.forEach((loop) => {
+              startLoopScheduler(loop);
+            });
+          });
+        }
+      });
+
+      /* =====================================================
+         WINDOW BLUR
+      ===================================================== */
+
+      /*
+       * 平板切換 App / Safari 狀態改變時，
+       * 確保長按 PAD 不會卡住。
+       */
+      window.addEventListener("blur", () => {
+        stopAllPadHolds();
+      });
+
+      /* =====================================================
+         INITIAL PADS
+      ===================================================== */
 
       createPad(10, 10);
 
       createPad(32, 18);
 
       /* =====================================================
-   INITIAL LOOP UI
-===================================================== */
+         INITIAL LOOP UI
+      ===================================================== */
 
       renderLoopLayers();
 
       updateLoopDurationUI();
+
+      setMasterVolume(1);
     </script>
   </body>
 </html>
