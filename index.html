@@ -18,20 +18,11 @@
       * {
         box-sizing: border-box;
 
-        /*
-         * 禁止所有文字選取。
-         */
         -webkit-user-select: none;
         user-select: none;
 
-        /*
-         * 禁止 iOS 長按叫出選單。
-         */
         -webkit-touch-callout: none;
 
-        /*
-         * 禁止瀏覽器預設 touch gesture。
-         */
         -webkit-tap-highlight-color: transparent;
       }
 
@@ -52,14 +43,8 @@
 
         overscroll-behavior: none;
 
-        /*
-         * 防止雙擊縮放 / pinch zoom。
-         */
         touch-action: none;
 
-        /*
-         * iOS Safari。
-         */
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
       }
@@ -73,9 +58,6 @@
         touch-action: none;
       }
 
-      /*
-       * 所有文字元素都禁止選取。
-       */
       body,
       div,
       span,
@@ -94,9 +76,6 @@
       }
 
       button {
-        /*
-         * 禁止瀏覽器自行處理 touch gesture。
-         */
         touch-action: none;
       }
 
@@ -131,9 +110,6 @@
 
         -webkit-overflow-scrolling: touch;
 
-        /*
-         * Toolbar 需要橫向滑動。
-         */
         touch-action: pan-x;
       }
 
@@ -204,9 +180,6 @@
 
         background: white;
 
-        /*
-         * 完全禁止 canvas 區域的瀏覽器手勢。
-         */
         touch-action: none;
 
         -webkit-user-select: none;
@@ -235,6 +208,60 @@
       .imageItem.selected {
         outline: 2px dashed black;
         outline-offset: 2px;
+      }
+
+      /*
+       * =====================================================
+       * PAD LOCAL IMAGE INVERT OVERLAY
+       * =====================================================
+       *
+       * 不再直接對整張圖片使用：
+       *
+       *     filter: invert(1)
+       *
+       * 而是建立一個只等於：
+       *
+       *     IMAGE ∩ PAD
+       *
+       * 的 overlay。
+       *
+       * 所以 PAD 多大，就只 inverse 那個範圍。
+       */
+
+      .imageInvertOverlay {
+        position: absolute;
+
+        pointer-events: none;
+
+        z-index: 4;
+
+        overflow: hidden;
+
+        filter: invert(1);
+        -webkit-filter: invert(1);
+
+        touch-action: none;
+
+        user-select: none;
+        -webkit-user-select: none;
+
+        -webkit-touch-callout: none;
+      }
+
+      .imageInvertOverlay img {
+        position: absolute;
+
+        left: 0;
+        top: 0;
+
+        pointer-events: none;
+
+        user-select: none;
+        -webkit-user-select: none;
+
+        -webkit-touch-callout: none;
+
+        object-fit: fill;
       }
 
       .imageResizeHandle {
@@ -279,10 +306,6 @@
         user-select: none;
         -webkit-user-select: none;
 
-        /*
-         * 最重要：
-         * PAD 不允許瀏覽器自己處理 touch。
-         */
         touch-action: none;
 
         cursor: pointer;
@@ -304,18 +327,29 @@
         border: 3px dashed white;
       }
 
-      /*
-       * PAD 正在被長按播放。
-       */
       .pad.playing {
         transform: scale(0.96);
       }
 
-      /*
-       * 長按播放時增加一點視覺提示。
-       */
       .pad.holding {
         transform: scale(0.96);
+      }
+
+      .padEffectStatus {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        top: 6px;
+        text-align: center;
+        font-size: 10px;
+        color: white;
+        opacity: 0.75;
+        pointer-events: none;
+        mix-blend-mode: difference;
+      }
+
+      #canvas.playMode .padEffectStatus {
+        display: block;
       }
 
       .padContent {
@@ -375,9 +409,6 @@
 
         pointer-events: auto;
 
-        /*
-         * Slider 本身需要可以操作。
-         */
         touch-action: none;
       }
 
@@ -406,9 +437,6 @@
 
         cursor: pointer;
 
-        /*
-         * range input 保留自己的操作。
-         */
         touch-action: auto;
 
         pointer-events: auto;
@@ -428,9 +456,6 @@
         mix-blend-mode: difference;
       }
 
-      /*
-       * Play Mode 不需要看到個別 PAD volume。
-       */
       #canvas.playMode .padControls {
         display: none;
       }
@@ -907,7 +932,10 @@
     ===================================================== -->
 
     <div id="canvas">
-      <div class="help">EDIT：單點預覽・雙擊錄音・拖曳移動・右下角調整大小</div>
+      <div class="help">
+        EDIT：單點預覽・雙擊錄音・拖曳移動・右下角調整大小・PLAY：長按 PAD，左右
+        Reverb/Distortion，上下 Frequency
+      </div>
 
       <div class="loopRecordingIndicator">● RECORDING LOOP</div>
     </div>
@@ -920,7 +948,7 @@
       <div class="masterVolume">
         <div class="masterHeader">
           <span class="masterLabel">MASTER</span>
-          <span id="masterVolumeValue" class="masterValue">100%</span>
+          <span id="masterVolumeValue" class="masterValue"> 100% </span>
         </div>
 
         <input
@@ -1071,9 +1099,6 @@
          TABLET / MOBILE GESTURE LOCK
       ===================================================== */
 
-      /*
-       * 防止選取文字。
-       */
       document.addEventListener(
         "selectstart",
         (event) => {
@@ -1082,9 +1107,6 @@
         { passive: false },
       );
 
-      /*
-       * 防止右鍵 / 長按選單。
-       */
       document.addEventListener(
         "contextmenu",
         (event) => {
@@ -1093,9 +1115,6 @@
         { passive: false },
       );
 
-      /*
-       * 防止 iOS Safari gesture zoom。
-       */
       document.addEventListener(
         "gesturestart",
         (event) => {
@@ -1120,9 +1139,6 @@
         { passive: false },
       );
 
-      /*
-       * 防止 double-click 的瀏覽器預設行為。
-       */
       document.addEventListener(
         "dblclick",
         (event) => {
@@ -1131,12 +1147,6 @@
         { passive: false },
       );
 
-      /*
-       * 防止多指觸控。
-       *
-       * 注意：
-       * range slider 不會走這裡的阻擋邏輯。
-       */
       document.addEventListener(
         "touchstart",
         (event) => {
@@ -1400,6 +1410,7 @@
 
         console.log("Audio trimmed:", {
           originalDuration: audioBuffer.duration,
+
           trimmedDuration: trimmedBuffer.duration,
         });
 
@@ -1438,20 +1449,6 @@
 
           pendingDoubleTap: false,
 
-          /*
-           * PLAY MODE 長按播放。
-           *
-           * holdSource = 目前正在 loop 的 source
-           * holdGain   = 這次播放的 volume gain
-           * holding    = 是否正在按住
-           */
-          /*
-           * PLAY MODE 長按重複播放。
-           *
-           * 不使用 source.loop，而是每次重新建立
-           * BufferSource。這樣即使下一次開始時間
-           * 早於上一個音檔結束，也可以自然重疊播放。
-           */
           holdSource: null,
 
           holdGain: null,
@@ -1464,9 +1461,24 @@
 
           holdInterval: 600,
 
+          holdLastTriggerTime: 0,
+
+          holdRAF: null,
+
+          holdNextTriggerIn: 600,
+
+          /*
+           * 目前這個 PAD 正在讓哪些圖片
+           * 建立 inverse overlay。
+           */
+          invertedImages: new Set(),
+
           holdTimer: null,
 
           holdGeneration: 0,
+
+          // 是否已離開中央乾聲區；第一次進入效果區時會立即換掉原本的乾聲 source。
+          holdEffectZoneActive: false,
         };
 
         sampler.pads.push(pad);
@@ -1701,10 +1713,6 @@
           valueElement.textContent = Math.round(volume * 100) + "%";
         }
 
-        /*
-         * 如果正在長按播放，
-         * 音量即時跟著 slider 改。
-         */
         if (pad.holdGain) {
           pad.holdGain.gain.setTargetAtTime(
             volume,
@@ -1730,6 +1738,14 @@
         pad.element.style.width = pad.width + "%";
 
         pad.element.style.height = pad.height + "%";
+
+        /*
+         * 如果 PLAY MODE 有 PAD 正在作用，
+         * 尺寸改變後重新計算 inverse。
+         */
+        if (sampler.mode === "play" && pad.holding) {
+          refreshAllPadImageInverts();
+        }
       }
 
       /* =====================================================
@@ -1769,27 +1785,271 @@
       renamePadButton.addEventListener("click", renameSelectedPad);
 
       /* =====================================================
-         PLAY MODE — HOLD PLAY
+         PLAY MODE — PAD IMAGE INVERT
       ===================================================== */
 
       /*
-       * ============================================================
-       * PLAY MODE — HOLD RETRIGGER
-       * ============================================================
-       *
-       * 長按 PAD：
-       *
-       *   1. 第一下立即播放。
-       *   2. 手指繼續按住時，不斷重新觸發同一個 PAD。
-       *   3. 手指往上移 → interval 變短 → 觸發越快。
-       *   4. 手指往下移 → interval 變長 → 觸發越慢。
-       *
-       * 重要：
-       * 這裡刻意不用 AudioBufferSourceNode.loop。
-       * 每一次 retrigger 都建立新的 BufferSource，
-       * 所以「下一次開始」不需要等「上一次結束」。
-       * 因此 interval 小於音檔長度時，聲音會重疊。
+       * 判斷兩個 DOM rectangle 是否有實際重疊。
        */
+      function rectanglesOverlap(a, b) {
+        return (
+          a.left < b.right &&
+          a.right > b.left &&
+          a.top < b.bottom &&
+          a.bottom > b.top
+        );
+      }
+
+      /*
+       * 找出 PAD 實際碰到的圖片。
+       */
+      function getImagesUnderPad(pad) {
+        if (!pad || !pad.element) {
+          return [];
+        }
+
+        const padRect = pad.element.getBoundingClientRect();
+
+        return sampler.images.filter((image) => {
+          if (!image.element) {
+            return false;
+          }
+
+          const imageRect = image.element.getBoundingClientRect();
+
+          return rectanglesOverlap(padRect, imageRect);
+        });
+      }
+
+      /*
+       * 移除某張圖片上，
+       * 某一個 PAD 所建立的 inverse overlay。
+       */
+      function removeImageInvertOverlay(image, pad) {
+        if (!image || !image.invertOverlays) {
+          return;
+        }
+
+        const overlay = image.invertOverlays.get(pad);
+
+        if (overlay) {
+          overlay.remove();
+        }
+
+        image.invertOverlays.delete(pad);
+      }
+
+      /*
+       * =====================================================
+       * CREATE IMAGE INVERT OVERLAY
+       * =====================================================
+       *
+       * 核心：
+       *
+       *     IMAGE ∩ PAD
+       *
+       * 只在實際交集區域建立 overlay。
+       */
+      function createImageInvertOverlay(image, pad) {
+        if (!image || !image.element || !pad || !pad.element) {
+          return null;
+        }
+
+        removeImageInvertOverlay(image, pad);
+
+        const imageRect = image.element.getBoundingClientRect();
+
+        const padRect = pad.element.getBoundingClientRect();
+
+        /*
+         * 計算圖片和 PAD 的實際交集。
+         */
+
+        const intersectionLeft = Math.max(imageRect.left, padRect.left);
+
+        const intersectionTop = Math.max(imageRect.top, padRect.top);
+
+        const intersectionRight = Math.min(imageRect.right, padRect.right);
+
+        const intersectionBottom = Math.min(imageRect.bottom, padRect.bottom);
+
+        const intersectionWidth = intersectionRight - intersectionLeft;
+
+        const intersectionHeight = intersectionBottom - intersectionTop;
+
+        /*
+         * 沒有交集。
+         */
+        if (intersectionWidth <= 0 || intersectionHeight <= 0) {
+          return null;
+        }
+
+        /*
+         * overlay 相對於圖片左上角的位置。
+         */
+        const localLeft = intersectionLeft - imageRect.left;
+
+        const localTop = intersectionTop - imageRect.top;
+
+        /*
+         * 建立 inverse overlay。
+         */
+        const overlay = document.createElement("div");
+
+        overlay.className = "imageInvertOverlay";
+
+        overlay.style.left = localLeft + "px";
+
+        overlay.style.top = localTop + "px";
+
+        overlay.style.width = intersectionWidth + "px";
+
+        overlay.style.height = intersectionHeight + "px";
+
+        /*
+         * overlay 裡面放同一張圖片。
+         */
+        const overlayImage = document.createElement("img");
+
+        overlayImage.src = image.url;
+
+        overlayImage.draggable = false;
+
+        /*
+         * 必須使用圖片實際 pixel 尺寸。
+         */
+        overlayImage.style.width = imageRect.width + "px";
+
+        overlayImage.style.height = imageRect.height + "px";
+
+        /*
+         * 把圖片內容往左／上移，
+         * 讓 overlay 中顯示的部分
+         * 和原圖完全對齊。
+         */
+        overlayImage.style.left = -localLeft + "px";
+
+        overlayImage.style.top = -localTop + "px";
+
+        overlay.appendChild(overlayImage);
+
+        /*
+         * 放入圖片 wrapper。
+         */
+        image.element.appendChild(overlay);
+
+        /*
+         * 建立 Map：
+         *
+         * PAD → overlay
+         */
+        if (!image.invertOverlays) {
+          image.invertOverlays = new Map();
+        }
+
+        image.invertOverlays.set(pad, overlay);
+
+        return overlay;
+      }
+
+      /*
+       * =====================================================
+       * APPLY PAD IMAGE INVERT
+       * =====================================================
+       */
+      function applyPadImageInvert(pad) {
+        if (!pad || sampler.mode !== "play") {
+          return;
+        }
+
+        /*
+         * 先清除舊的。
+         */
+        clearPadImageInvert(pad);
+
+        const images = getImagesUnderPad(pad);
+
+        /*
+         * 記住這個 PAD 目前作用在哪些圖片。
+         */
+        pad.invertedImages = new Set(images);
+
+        images.forEach((image) => {
+          createImageInvertOverlay(image, pad);
+        });
+      }
+
+      /*
+       * =====================================================
+       * CLEAR PAD IMAGE INVERT
+       * =====================================================
+       */
+      function clearPadImageInvert(pad) {
+        if (!pad) {
+          return;
+        }
+
+        if (pad.invertedImages) {
+          pad.invertedImages.forEach((image) => {
+            removeImageInvertOverlay(image, pad);
+          });
+
+          pad.invertedImages.clear();
+        }
+
+        /*
+         * 保險清除。
+         */
+        sampler.images.forEach((image) => {
+          removeImageInvertOverlay(image, pad);
+        });
+      }
+
+      /*
+       * =====================================================
+       * REFRESH ALL PAD INVERT OVERLAYS
+       * =====================================================
+       *
+       * PAD / IMAGE 的 pixel rectangle 改變時，
+       * 重新計算 inverse 範圍。
+       */
+      function refreshAllPadImageInverts() {
+        if (sampler.mode !== "play") {
+          return;
+        }
+
+        sampler.pads.forEach((pad) => {
+          if (!pad.holding) {
+            return;
+          }
+
+          /*
+           * 先移除目前 overlay。
+           */
+          const oldImages = pad.invertedImages
+            ? Array.from(pad.invertedImages)
+            : [];
+
+          oldImages.forEach((image) => {
+            removeImageInvertOverlay(image, pad);
+          });
+
+          /*
+           * 重新找圖片。
+           */
+          const images = getImagesUnderPad(pad);
+
+          pad.invertedImages = new Set(images);
+
+          images.forEach((image) => {
+            createImageInvertOverlay(image, pad);
+          });
+        });
+      }
+
+      /* =====================================================
+         PLAY MODE — HOLD PLAY
+      ===================================================== */
 
       const HOLD_BASE_INTERVAL = 600;
 
@@ -1797,17 +2057,6 @@
 
       const HOLD_MAX_INTERVAL = 1400;
 
-      /*
-       * 每移動 1px，interval 改變多少毫秒。
-       *
-       * 往上：
-       *   dy < 0
-       *   interval 變短
-       *
-       * 往下：
-       *   dy > 0
-       *   interval 變長
-       */
       const HOLD_INTERVAL_PER_PIXEL = 4;
 
       function getHoldIntervalFromY(pad, currentY) {
@@ -1830,15 +2079,45 @@
 
         pad.holdInterval = newInterval;
 
-        /*
-         * 速度改變後，重新安排下一次 retrigger。
-         *
-         * 不是等舊 timer 跑完，所以滑動速度會立即生效。
-         */
-        scheduleNextPadHold(pad, true);
+        updatePadHoldSpeedUI(pad);
       }
 
-      function scheduleNextPadHold(pad, immediateReschedule = false) {
+      function stopCurrentPadHoldSource(pad) {
+        if (!pad) return;
+
+        const source = pad.holdSource;
+
+        if (!source) return;
+
+        pad.holdSource = null;
+
+        try {
+          source.onended = null;
+        } catch (error) {}
+
+        try {
+          source.stop();
+        } catch (error) {}
+
+        try {
+          source.disconnect();
+        } catch (error) {}
+
+        if (pad.holdGain) {
+          try {
+            pad.holdGain.disconnect();
+          } catch (error) {}
+        }
+
+        pad.holdGain = null;
+        pad.holdFilter = null;
+        pad.holdReverbDry = null;
+        pad.holdReverbWet = null;
+        pad.holdConvolver = null;
+        pad.holdDistortion = null;
+      }
+
+      function runPadHoldScheduler(pad) {
         if (!pad || !pad.holding) {
           return;
         }
@@ -1847,54 +2126,55 @@
           return;
         }
 
-        if (pad.holdTimer !== null) {
-          clearTimeout(pad.holdTimer);
-
-          pad.holdTimer = null;
+        if (sampler.mode !== "play") {
+          return;
         }
 
-        const generation = pad.holdGeneration;
+        const now = performance.now();
 
-        /*
-         * 用目前 interval 決定下一次開始。
-         *
-         * 如果 interval = 200ms，
-         * 就是每 200ms 開始一次。
-         *
-         * 不管前一個音檔是不是已經播放完。
-         */
-        const delay = immediateReschedule
-          ? Math.max(10, Math.min(pad.holdInterval, 120))
-          : pad.holdInterval;
+        if (now - pad.holdLastTriggerTime >= pad.holdInterval) {
+          pad.holdLastTriggerTime = now;
 
-        pad.holdTimer = setTimeout(() => {
-          pad.holdTimer = null;
+          // 每次重新觸發都讓自己的聲音完整播放，
+          // 不停止前一個 source；不同次觸發可以自然重疊。
+          recordPadEvent(pad);
 
-          if (!pad.holding) {
-            return;
-          }
+          playPad(pad, {
+            isHoldSource: true,
+            playbackRate: pad.holdFrequency ?? 1,
+            reverb: pad.holdReverb ?? 0,
+            distortion: pad.holdDistortion ?? 0,
+          });
+        }
 
-          if (pad.holdGeneration !== generation) {
-            return;
-          }
-
-          if (sampler.mode !== "play") {
-            return;
-          }
-
-          /*
-           * 這一次新的播放可以和上一個聲音重疊。
-           */
-          playPad(pad);
-
-          /*
-           * 繼續下一次。
-           */
-          scheduleNextPadHold(pad);
-        }, delay);
+        pad.holdRAF = requestAnimationFrame(() => {
+          runPadHoldScheduler(pad);
+        });
       }
 
-      async function startPadHold(pad, pointerId, startY) {
+      function scheduleNextPadHold(pad) {
+        if (!pad || !pad.holding) {
+          return;
+        }
+
+        if (!pad.audioBuffer) {
+          return;
+        }
+
+        if (pad.holdRAF !== null) {
+          cancelAnimationFrame(pad.holdRAF);
+
+          pad.holdRAF = null;
+        }
+
+        pad.holdLastTriggerTime = performance.now();
+
+        pad.holdRAF = requestAnimationFrame(() => {
+          runPadHoldScheduler(pad);
+        });
+      }
+
+      async function startPadHold(pad, pointerId, startX, startY) {
         if (sampler.mode !== "play") {
           return;
         }
@@ -1907,19 +2187,22 @@
           return;
         }
 
-        /*
-         * 先記住 pointer 狀態。
-         *
-         * 因為 resumeAudio() 是 async，
-         * 使用者可能在它完成前就放手。
-         */
         pad.holdPointerId = pointerId;
 
         pad.holdStartY = startY;
+        pad.holdStartX = startX;
+
+        pad.holdFrequency = 1;
+        pad.holdReverb = 0;
+        pad.holdDistortionAmount = 0;
+        pad.holdDistortion = 0;
 
         pad.holdInterval = HOLD_BASE_INTERVAL;
 
+        pad.holdLastTriggerTime = 0;
+
         pad.holdGeneration++;
+        pad.holdEffectZoneActive = false;
 
         const generation = pad.holdGeneration;
 
@@ -1933,10 +2216,6 @@
           return;
         }
 
-        /*
-         * 如果使用者已經放開，或 mode 已經切換，
-         * 就不要開始長按播放。
-         */
         if (sampler.mode !== "play") {
           pad.holdPointerId = null;
 
@@ -1958,22 +2237,33 @@
         /*
          * 第一下立即播放。
          */
-        playPad(pad);
+        recordPadEvent(pad);
+
+        playPad(pad, {
+          isHoldSource: true,
+          playbackRate: pad.holdFrequency,
+          reverb: pad.holdReverb,
+          distortion: pad.holdDistortionAmount,
+        });
 
         if (pad.element) {
           pad.element.classList.add("holding");
         }
 
-        updatePadHoldSpeedUI(pad);
+        updatePadEffectUI(pad);
+
+        scheduleNextPadHold(pad);
 
         /*
-         * 開始 retrigger。
+         * resumeAudio() 是 async，
+         * 為避免開始播放後 overlay 因為 layout
+         * 尚未完成而位置不準，再算一次。
          */
-        scheduleNextPadHold(pad);
+        refreshAllPadImageInverts();
       }
 
       /* =====================================================
-         PLAY MODE — RELEASE PAD
+         RELEASE PAD
       ===================================================== */
 
       function stopPadHold(pad, pointerId = null) {
@@ -1981,10 +2271,6 @@
           return;
         }
 
-        /*
-         * 如果指定 pointerId，
-         * 只有目前這根手指可以停止它。
-         */
         if (
           pointerId !== null &&
           pad.holdPointerId !== null &&
@@ -1999,49 +2285,31 @@
 
         pad.holdGeneration++;
 
+        if (pad.holdRAF !== null) {
+          cancelAnimationFrame(pad.holdRAF);
+
+          pad.holdRAF = null;
+        }
+
         if (pad.holdTimer !== null) {
           clearTimeout(pad.holdTimer);
 
           pad.holdTimer = null;
         }
 
+        // 放開 PAD 不截斷正在播放的聲音。
+        // 每一次觸發都讓音檔完整播放完畢。
+        pad.holdEffectZoneActive = false;
+
         /*
-         * holdSource 保留作為相容欄位。
-         * 新版 retrigger 不依賴單一 loop source。
+         * 放開 PAD：
+         * 清除這個 PAD 的所有 inverse。
          */
-        const source = pad.holdSource;
-
-        const gain = pad.holdGain;
-
-        pad.holdSource = null;
-
-        pad.holdGain = null;
-
-        if (source) {
-          try {
-            source.stop();
-          } catch (error) {}
-
-          try {
-            source.disconnect();
-          } catch (error) {}
-        }
-
-        if (gain) {
-          try {
-            gain.disconnect();
-          } catch (error) {}
-        }
+        clearPadImageInvert(pad);
 
         if (pad.element) {
           pad.element.classList.remove("holding");
 
-          /*
-           * 這裡只移除 hold 的視覺狀態。
-           *
-           * playPad() 自己建立的短暫 source
-           * 會在 onended 時自行清理。
-           */
           if (!pad.holding) {
             pad.element.classList.remove("playing");
           }
@@ -2085,25 +2353,7 @@
           "pointerdown",
           async (event) => {
             /*
-             * =================================================
              * PLAY MODE
-             * =================================================
-             *
-             * 長按 PAD：
-             *
-             *   第一聲立即播放。
-             *
-             *   手指往上移：
-             *     retrigger interval 變短
-             *     → 播放越來越快。
-             *
-             *   手指往下移：
-             *     retrigger interval 變長
-             *     → 播放越來越慢。
-             *
-             * 注意：
-             * 每一次都是新的 BufferSource，
-             * 所以不需要等待上一個音檔播完。
              */
             if (sampler.mode === "play") {
               if (event.target.closest(".padControls")) {
@@ -2117,14 +2367,19 @@
               } catch (error) {}
 
               /*
-               * 一次 pointerdown = 一次 loop event。
+               * 按下瞬間：
                *
-               * 長按期間的 retrigger 不會一直
-               * 重複寫入 Loop 錄音事件。
+               * PAD 多大，
+               * 就只 inverse PAD 範圍。
                */
-              recordPadEvent(pad);
+              applyPadImageInvert(pad);
 
-              await startPadHold(pad, event.pointerId, event.clientY);
+              await startPadHold(
+                pad,
+                event.pointerId,
+                event.clientX,
+                event.clientY,
+              );
 
               return;
             }
@@ -2182,10 +2437,6 @@
 
             const timeSinceLastTap = now - pad.lastTapTime;
 
-            /*
-             * 第二次點擊：
-             * 啟動錄音。
-             */
             if (pad.lastTapTime > 0 && timeSinceLastTap < DOUBLE_TAP_TIME) {
               pad.lastTapTime = 0;
 
@@ -2193,10 +2444,6 @@
 
               startRecording(pad);
             } else {
-              /*
-               * 第一次點擊：
-               * 選取 + 預覽。
-               */
               pad.lastTapTime = now;
 
               pad.pendingDoubleTap = false;
@@ -2215,15 +2462,14 @@
             /*
              * PLAY MODE：
              *
-             * 不拖曳 PAD。
-             *
-             * Y 軸移動用來控制 retrigger speed。
+             * X / Y 同時控制效果。
+             * 中央隱形正方形為乾聲基準區。
              */
             if (sampler.mode === "play") {
               event.preventDefault();
 
               if (pad.holding && pad.holdPointerId === event.pointerId) {
-                updatePadHoldSpeed(pad, event.clientY);
+                updatePadEffectState(pad, event.clientX, event.clientY);
               }
 
               return;
@@ -2279,10 +2525,6 @@
         element.addEventListener(
           "pointerup",
           (event) => {
-            /*
-             * PLAY MODE：
-             * 放開就停止 retrigger。
-             */
             if (sampler.mode === "play") {
               event.preventDefault();
 
@@ -2354,12 +2596,6 @@
           { passive: false },
         );
 
-        /*
-         * iPad Safari / pointer capture 特別重要。
-         *
-         * 如果手指滑出 PAD 後 Safari 發生
-         * lostpointercapture，也必須停止聲音。
-         */
         element.addEventListener("lostpointercapture", () => {
           if (sampler.mode === "play") {
             stopPadHold(pad);
@@ -2414,6 +2650,15 @@
           url: URL.createObjectURL(file),
 
           element: null,
+
+          /*
+           * Map：
+           *
+           * PAD → inverse overlay
+           *
+           * 允許多個 PAD 同時作用。
+           */
+          invertOverlays: new Map(),
         };
 
         sampler.images.push(image);
@@ -2422,6 +2667,10 @@
 
         selectImage(image);
       }
+
+      /* =====================================================
+         RENDER IMAGE
+      ===================================================== */
 
       function renderImage(image) {
         const wrapper = document.createElement("div");
@@ -2450,6 +2699,9 @@
 
         img.style.pointerEvents = "none";
 
+        /*
+         * Resize handle。
+         */
         const resizeHandle = document.createElement("div");
 
         resizeHandle.className = "imageResizeHandle";
@@ -2461,6 +2713,10 @@
         canvas.appendChild(wrapper);
 
         image.element = wrapper;
+
+        if (!image.invertOverlays) {
+          image.invertOverlays = new Map();
+        }
 
         setupImageInteraction(image, wrapper, resizeHandle);
       }
@@ -2477,6 +2733,18 @@
         image.element.style.width = image.width + "%";
 
         image.element.style.height = image.height + "%";
+
+        /*
+         * 如果目前 PLAY MODE 有 inverse，
+         * 尺寸變化後重新計算。
+         */
+        if (
+          sampler.mode === "play" &&
+          image.invertOverlays &&
+          image.invertOverlays.size > 0
+        ) {
+          refreshAllPadImageInverts();
+        }
       }
 
       /* =====================================================
@@ -2595,6 +2863,11 @@
             stopRecording();
           }
 
+          /*
+           * 清除這個 PAD 的 inverse。
+           */
+          clearPadImageInvert(pad);
+
           if (pad.audioURL) {
             URL.revokeObjectURL(pad.audioURL);
           }
@@ -2612,6 +2885,30 @@
 
         if (sampler.selectedImage) {
           const image = sampler.selectedImage;
+
+          /*
+           * 移除這張圖片上的
+           * 所有 inverse overlay。
+           */
+          if (image.invertOverlays) {
+            image.invertOverlays.forEach((overlay) => {
+              if (overlay) {
+                overlay.remove();
+              }
+            });
+
+            image.invertOverlays.clear();
+          }
+
+          /*
+           * 從所有 PAD 的
+           * invertedImages 移除。
+           */
+          sampler.pads.forEach((pad) => {
+            if (pad.invertedImages) {
+              pad.invertedImages.delete(image);
+            }
+          });
 
           if (image.url) {
             URL.revokeObjectURL(image.url);
@@ -2834,6 +3131,263 @@
       }
 
       /* =====================================================
+         PLAY MODE — AUDIO EFFECTS
+
+         操作方式：
+         - 中央隱形正方形：完全乾聲 / 原始頻率
+         - 正方形左側：Reverb 越往左越重
+         - 正方形右側：Distortion 越往右越重
+         - 正方形上側：頻率越往上越高
+         - 正方形下側：頻率越往下越低
+         - 中央正方形不會畫出來，只作為控制基準區
+      ===================================================== */
+
+      // 隱形中央控制正方形的半邊大小（px）
+      // 越大，越容易維持乾聲／原始頻率。
+      const EFFECT_NEUTRAL_HALF = 75;
+
+      // 從中央基準區到效果最大值所需要移動的距離。
+      // 調大會讓效果變化更慢、更細。
+      const EFFECT_X_RANGE = 420;
+      const EFFECT_Y_RANGE = 340;
+
+      // 頻率變化範圍。刻意縮小，避免一點點移動就變很多。
+      const MIN_PLAYBACK_RATE = 0.72;
+      const MAX_PLAYBACK_RATE = 1.38;
+
+      function makeReverbImpulse(duration = 2.8, decay = 2.2) {
+        const ctx = sampler.audioContext;
+        const length = Math.max(1, Math.floor(ctx.sampleRate * duration));
+        const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+
+        for (let channel = 0; channel < impulse.numberOfChannels; channel++) {
+          const data = impulse.getChannelData(channel);
+          for (let i = 0; i < length; i++) {
+            const t = i / length;
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+          }
+        }
+        return impulse;
+      }
+
+      function makeDistortionCurve(amount = 0) {
+        const samples = 44100;
+        const curve = new Float32Array(samples);
+
+        if (amount <= 0.0001) {
+          for (let i = 0; i < samples; i++) {
+            curve[i] = (i * 2) / samples - 1;
+          }
+          return curve;
+        }
+
+        // 比上一版更容易聽出來，但仍然保持由左到右漸進。
+        const k = 1 + amount * 80;
+        for (let i = 0; i < samples; i++) {
+          const x = (i * 2) / samples - 1;
+          curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+        }
+        return curve;
+      }
+
+      function clamp01(value) {
+        return Math.max(0, Math.min(1, Number(value) || 0));
+      }
+
+      function getPadEffectState(pad, currentX, currentY) {
+        const dx = currentX - pad.holdStartX;
+        const dy = currentY - pad.holdStartY;
+
+        /*
+         * 中央隱形正方形：
+         * |dx| <= EFFECT_NEUTRAL_HALF 且 |dy| <= EFFECT_NEUTRAL_HALF
+         * 時完全不加效果，frequency = 1。
+         */
+        const horizontalDistance = Math.max(
+          0,
+          Math.abs(dx) - EFFECT_NEUTRAL_HALF,
+        );
+        const verticalDistance = Math.max(
+          0,
+          Math.abs(dy) - EFFECT_NEUTRAL_HALF,
+        );
+
+        // 左邊只增加 Reverb，右邊只增加 Distortion。
+        const reverb =
+          dx < -EFFECT_NEUTRAL_HALF
+            ? clamp01(horizontalDistance / EFFECT_X_RANGE)
+            : 0;
+
+        const distortion =
+          dx > EFFECT_NEUTRAL_HALF
+            ? clamp01(horizontalDistance / EFFECT_X_RANGE)
+            : 0;
+
+        // 上方提高頻率，下方降低頻率。
+        let playbackRate = 1;
+
+        if (dy < -EFFECT_NEUTRAL_HALF) {
+          const amount = clamp01(verticalDistance / EFFECT_Y_RANGE);
+          playbackRate = 1 + amount * (MAX_PLAYBACK_RATE - 1);
+        } else if (dy > EFFECT_NEUTRAL_HALF) {
+          const amount = clamp01(verticalDistance / EFFECT_Y_RANGE);
+          playbackRate = 1 - amount * (1 - MIN_PLAYBACK_RATE);
+        }
+
+        return {
+          reverb,
+          distortion,
+          playbackRate,
+        };
+      }
+
+      function updatePadEffectState(pad, currentX, currentY) {
+        if (!pad || !pad.holding) return;
+
+        const state = getPadEffectState(pad, currentX, currentY);
+
+        pad.holdReverb = state.reverb;
+        pad.holdDistortion = state.distortion;
+        pad.holdDistortionAmount = state.distortion;
+        pad.holdFrequency = state.playbackRate;
+
+        updatePadEffectUI(pad);
+
+        const ctx = sampler.audioContext;
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        /*
+         * 不重新建立 source。
+         *
+         * 這是這版最重要的修正：
+         * - 第一次按下產生的聲音就是「目前這一個 source」
+         * - 拖曳時直接改它的 playbackRate / distortion / reverb
+         * - 因此不會出現「原本乾聲 + 新效果聲」兩個聲音疊在一起
+         * - 同時也不需要 stop()，所以音檔會完整播放完
+         */
+
+        const smoothing = 0.08;
+
+        if (pad.holdReverbDry) {
+          pad.holdReverbDry.gain.cancelScheduledValues(now);
+          pad.holdReverbDry.gain.setTargetAtTime(
+            Math.max(0.08, 1 - state.reverb * 0.72),
+            now,
+            smoothing,
+          );
+        }
+
+        if (pad.holdReverbWet) {
+          pad.holdReverbWet.gain.cancelScheduledValues(now);
+          pad.holdReverbWet.gain.setTargetAtTime(
+            state.reverb * 1.05,
+            now,
+            smoothing,
+          );
+        }
+
+        if (pad.holdDistortion) {
+          pad.holdDistortion.curve = makeDistortionCurve(state.distortion);
+        }
+
+        if (pad.holdSource) {
+          try {
+            pad.holdSource.playbackRate.cancelScheduledValues(now);
+            pad.holdSource.playbackRate.setTargetAtTime(
+              state.playbackRate,
+              now,
+              smoothing,
+            );
+          } catch (error) {}
+        }
+      }
+
+      function updatePadEffectUI(pad) {
+        const element = pad.element?.querySelector(".padEffectStatus");
+        if (!element || !pad.holding) return;
+
+        const reverb = Math.round(pad.holdReverb * 100);
+        const distortion = Math.round(
+          (pad.holdDistortion ?? pad.holdDistortionAmount ?? 0) * 100,
+        );
+        const freq = pad.holdFrequency.toFixed(2);
+
+        if (pad.holdReverb > 0.02) {
+          element.textContent = `REVERB ${reverb}%  •  FREQ ${freq}×`;
+        } else if (pad.holdDistortion > 0.02) {
+          element.textContent = `DIST ${distortion}%  •  FREQ ${freq}×`;
+        } else {
+          element.textContent = `FREQ ${freq}×`;
+        }
+      }
+
+      function connectPadAudioChain(source, pad, destination, options = {}) {
+        const ctx = sampler.audioContext;
+
+        const playbackRate =
+          options.playbackRate !== undefined ? options.playbackRate : 1;
+
+        const reverb =
+          options.reverb !== undefined ? clamp01(options.reverb) : 0;
+
+        const distortion =
+          options.distortion !== undefined ? clamp01(options.distortion) : 0;
+
+        const padGain = ctx.createGain();
+        padGain.gain.value = pad.volume;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 20000;
+        filter.Q.value = 0.2;
+
+        const distortionNode = ctx.createWaveShaper();
+        distortionNode.oversample = "4x";
+        distortionNode.curve = makeDistortionCurve(distortion);
+
+        const dryGain = ctx.createGain();
+        const wetGain = ctx.createGain();
+        dryGain.gain.value = Math.max(0.08, 1 - reverb * 0.72);
+        wetGain.gain.value = reverb * 1.05;
+
+        const convolver = ctx.createConvolver();
+        convolver.buffer = makeReverbImpulse();
+
+        source.playbackRate.value = playbackRate;
+
+        source.connect(filter);
+        filter.connect(distortionNode);
+
+        distortionNode.connect(dryGain);
+        dryGain.connect(padGain);
+
+        distortionNode.connect(convolver);
+        convolver.connect(wetGain);
+        wetGain.connect(padGain);
+
+        padGain.connect(destination);
+
+        return {
+          padGain,
+          filter,
+          distortionNode,
+          dryGain,
+          wetGain,
+          convolver,
+        };
+      }
+
+      function disconnectPadAudioChain(chain) {
+        if (!chain) return;
+        Object.values(chain).forEach((node) => {
+          try {
+            node.disconnect();
+          } catch (error) {}
+        });
+      }
+
+      /* =====================================================
          PLAY PAD — NORMAL PREVIEW
       ===================================================== */
 
@@ -2848,17 +3402,26 @@
           sampler.audioContext.resume();
         }
 
-        const padGain = sampler.audioContext.createGain();
-
-        padGain.gain.value = pad.volume;
-
-        padGain.connect(sampler.masterGain);
-
         const source = sampler.audioContext.createBufferSource();
 
         source.buffer = pad.audioBuffer;
 
-        source.connect(padGain);
+        const chain = connectPadAudioChain(
+          source,
+          pad,
+          options.destination || sampler.masterGain,
+          {
+            playbackRate:
+              options.playbackRate !== undefined
+                ? options.playbackRate
+                : options.frequency !== undefined
+                  ? options.frequency
+                  : 1,
+            reverb: options.reverb !== undefined ? options.reverb : 0,
+            distortion:
+              options.distortion !== undefined ? options.distortion : 0,
+          },
+        );
 
         const startTime =
           options.startTime !== undefined
@@ -2871,24 +3434,38 @@
           pad.element.classList.add("playing");
         }
 
+        if (options.isHoldSource) {
+          pad.holdSource = source;
+          pad.holdGain = chain.padGain;
+          pad.holdFilter = chain.filter;
+          pad.holdReverbDry = chain.dryGain;
+          pad.holdReverbWet = chain.wetGain;
+          pad.holdConvolver = chain.convolver;
+          pad.holdDistortion = chain.distortionNode;
+        }
+
         source.onended = () => {
           if (pad.element) {
-            /*
-             * 如果此時不是 hold，
-             * 才移除 playing。
-             */
             if (!pad.holding) {
               pad.element.classList.remove("playing");
             }
+          }
+
+          if (pad.holdSource === source) {
+            pad.holdSource = null;
+            pad.holdGain = null;
+            pad.holdFilter = null;
+            pad.holdReverbDry = null;
+            pad.holdReverbWet = null;
+            pad.holdConvolver = null;
+            pad.holdDistortion = null;
           }
 
           try {
             source.disconnect();
           } catch (error) {}
 
-          try {
-            padGain.disconnect();
-          } catch (error) {}
+          disconnectPadAudioChain(chain);
         };
 
         return source;
@@ -2950,6 +3527,9 @@
         sampler.loopEvents.push({
           pad: pad,
           time: Math.max(0, time),
+          playbackRate: pad.holdFrequency ?? 1,
+          reverb: pad.holdReverb ?? 0,
+          distortion: pad.holdDistortion ?? pad.holdDistortionAmount ?? 0,
         });
       }
 
@@ -2991,6 +3571,9 @@
         const events = sampler.loopEvents.map((event) => ({
           pad: event.pad,
           time: event.time,
+          playbackRate: event.playbackRate ?? 1,
+          reverb: event.reverb ?? 0,
+          distortion: event.distortion ?? 0,
         }));
 
         const recordingStart = sampler.loopRecordingStartTime;
@@ -3229,13 +3812,11 @@
 
           source.buffer = event.pad.audioBuffer;
 
-          const padGain = sampler.audioContext.createGain();
-
-          padGain.gain.value = event.pad.volume;
-
-          padGain.connect(loop.gain);
-
-          source.connect(padGain);
+          const chain = connectPadAudioChain(source, event.pad, loop.gain, {
+            playbackRate: event.playbackRate ?? 1,
+            reverb: event.reverb ?? 0,
+            distortion: event.distortion ?? 0,
+          });
 
           const startTime = cycleStartTime + event.time;
 
@@ -3245,7 +3826,7 @@
             } catch (error) {}
 
             try {
-              padGain.disconnect();
+              disconnectPadAudioChain(chain);
             } catch (error) {}
 
             return;
@@ -3275,7 +3856,7 @@
             } catch (error) {}
 
             try {
-              padGain.disconnect();
+              disconnectPadAudioChain(chain);
             } catch (error) {}
           };
         });
@@ -3610,6 +4191,13 @@
 
           setMasterVolume(sampler.masterVolume);
 
+          /*
+           * 進入 PLAY MODE 時，
+           * 如果有既有 hold 狀態，
+           * 重新建立 inverse。
+           */
+          refreshAllPadImageInverts();
+
           if (sampler.loops.length > 0) {
             sampler.loops.forEach((loop) => {
               startLoopScheduler(loop);
@@ -3626,9 +4214,14 @@
 
       function enableEditMode() {
         /*
-         * 先停止所有長按 Pad。
+         * 停止所有長按 PAD。
          */
         stopAllPadHolds();
+
+        /*
+         * 清除所有 inverse overlay。
+         */
+        sampler.pads.forEach(clearPadImageInvert);
 
         if (sampler.loopRecording) {
           sampler.cancelLoopRecording = true;
@@ -3701,6 +4294,15 @@
         sampler.pads.forEach(updatePad);
 
         sampler.images.forEach(updateImage);
+
+        /*
+         * window 尺寸改變後，
+         * PAD / IMAGE 的實際 pixel
+         * rectangle 都會改變。
+         *
+         * 所以重新計算 inverse。
+         */
+        refreshAllPadImageInverts();
       });
 
       /* =====================================================
@@ -3708,10 +4310,6 @@
       ===================================================== */
 
       document.addEventListener("visibilitychange", () => {
-        /*
-         * 離開頁面時：
-         * 長按 PAD 一定要停止。
-         */
         if (document.hidden) {
           stopAllPadHolds();
 
@@ -3737,10 +4335,6 @@
          WINDOW BLUR
       ===================================================== */
 
-      /*
-       * 平板切換 App / Safari 狀態改變時，
-       * 確保長按 PAD 不會卡住。
-       */
       window.addEventListener("blur", () => {
         stopAllPadHolds();
       });
