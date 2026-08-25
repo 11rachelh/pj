@@ -2,339 +2,209 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-
     <title>Visual Sampler</title>
-
     <style>
-      /* =====================================================
-         GLOBAL
-      ===================================================== */
-
       * {
         box-sizing: border-box;
-
         -webkit-user-select: none;
         user-select: none;
-
         -webkit-touch-callout: none;
-
         -webkit-tap-highlight-color: transparent;
       }
-
       html,
       body {
         margin: 0;
         padding: 0;
-
         width: 100%;
         height: 100%;
-
         overflow: hidden;
-
         font-family: Arial, sans-serif;
-
-        background: white;
-        color: black;
-
+        background: #fff;
+        color: #000;
         overscroll-behavior: none;
-
         touch-action: none;
-
         -webkit-text-size-adjust: 100%;
-        text-size-adjust: 100%;
       }
-
-      body {
-        -webkit-user-select: none;
-        user-select: none;
-
-        -webkit-touch-callout: none;
-
-        touch-action: none;
-      }
-
-      body,
-      div,
-      span,
-      button,
-      label,
-      input,
-      img {
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-touch-callout: none;
-      }
-
       button,
       input {
         font-family: inherit;
       }
-
       button {
         touch-action: none;
       }
-
-      /* =====================================================
-         TOOLBAR
-      ===================================================== */
-
       .toolbar {
         position: fixed;
-
         top: 0;
         left: 0;
         right: 0;
-
         height: 60px;
-
         display: flex;
         align-items: center;
-
         gap: 8px;
-
         padding: 10px 15px;
-
-        background: white;
-
-        border-bottom: 1px solid black;
-
+        background: transparent;
         z-index: 1000;
-
         overflow-x: auto;
         overflow-y: hidden;
-
-        -webkit-overflow-scrolling: touch;
-
         touch-action: pan-x;
+        mix-blend-mode: difference;
       }
-
+      .toolbar * {
+        mix-blend-mode: normal !important;
+      }
       button {
         flex-shrink: 0;
-
-        border: 1px solid black;
-
-        background: white;
-        color: black;
-
+        border: 1px solid #fff;
+        background: transparent;
+        color: #fff;
         border-radius: 0;
-
         padding: 8px 14px;
-
         font-size: 14px;
-
         cursor: pointer;
-
-        -webkit-tap-highlight-color: transparent;
       }
-
       button:hover {
-        background: #eee;
+        background: #fff;
+        color: #000;
       }
-
       button:active {
-        background: #ddd;
+        transform: scale(0.94);
       }
-
-      .modeButton.active {
-        background: black;
-        color: white;
+      .toolbar button:hover,
+      .loopArea button:hover {
+        background: #fff !important;
+        color: #000 !important;
       }
-
-      #addPad {
-        margin-left: auto;
+      .backgroundButton {
+        display: none;
       }
-
+      body:not(.playMode) .backgroundButton {
+        display: block;
+      }
       #imageInput,
-      #audioInput {
+      #audioInput,
+      #backgroundImageInput,
+      #backgroundColorInput {
         position: fixed;
-
         width: 1px;
         height: 1px;
-
         opacity: 0;
-
         pointer-events: none;
       }
-
-      /* =====================================================
-         CANVAS
-      ===================================================== */
-
       #canvas {
         position: fixed;
-
-        left: 0;
-        right: 0;
-
-        top: 60px;
-        bottom: 0;
-
+        inset: 0;
         width: 100%;
-
         overflow: hidden;
-
-        background: white;
-
+        background: #fff;
         touch-action: none;
-
-        -webkit-user-select: none;
-        user-select: none;
       }
-
-      /* =====================================================
-         IMAGE OBJECT
-      ===================================================== */
-
+      #canvasBackground {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+        background: #fff;
+      }
+      #canvasBackground img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        pointer-events: none;
+      }
       .imageItem {
         position: absolute;
-
         user-select: none;
-        -webkit-user-select: none;
-
         touch-action: none;
-
         cursor: pointer;
-
         z-index: 2;
-
-        -webkit-touch-callout: none;
       }
-
       .imageItem.selected {
-        outline: 2px dashed black;
+        outline: 2px dashed #fff;
         outline-offset: 2px;
       }
-
-      /*
-       * =====================================================
-       * PAD LOCAL IMAGE INVERT OVERLAY
-       * =====================================================
-       *
-       * 不再直接對整張圖片使用：
-       *
-       *     filter: invert(1)
-       *
-       * 而是建立一個只等於：
-       *
-       *     IMAGE ∩ PAD
-       *
-       * 的 overlay。
-       *
-       * 所以 PAD 多大，就只 inverse 那個範圍。
-       */
-
+      .imageMedia {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        pointer-events: none;
+      }
       .imageInvertOverlay {
         position: absolute;
-
         pointer-events: none;
-
         z-index: 4;
-
         overflow: hidden;
-
-        filter: invert(1);
-        -webkit-filter: invert(1);
-
+        background: #fff;
+        mix-blend-mode: difference;
         touch-action: none;
-
-        user-select: none;
-        -webkit-user-select: none;
-
-        -webkit-touch-callout: none;
       }
-
-      .imageInvertOverlay img {
-        position: absolute;
-
-        left: 0;
-        top: 0;
-
-        pointer-events: none;
-
-        user-select: none;
-        -webkit-user-select: none;
-
-        -webkit-touch-callout: none;
-
-        object-fit: fill;
-      }
-
       .imageResizeHandle {
         position: absolute;
-
         width: 14px;
         height: 14px;
-
         right: -2px;
         bottom: -2px;
-
-        background: black;
-
+        background: #fff;
         cursor: nwse-resize;
-
-        touch-action: none;
-
         z-index: 5;
+        mix-blend-mode: difference;
       }
-
-      /* =====================================================
-         PAD
-      ===================================================== */
-
       .pad {
         position: absolute;
-
         width: 15%;
         height: 15%;
-
         background: transparent;
-
-        border: 2px solid white;
-
+        border: 2px solid #fff;
         border-radius: 0;
-
         display: flex;
-
         align-items: center;
         justify-content: center;
-
-        user-select: none;
-        -webkit-user-select: none;
-
         touch-action: none;
-
         cursor: pointer;
-
         z-index: 10;
-
         mix-blend-mode: difference;
-
-        -webkit-tap-highlight-color: transparent;
-
-        -webkit-touch-callout: none;
       }
-
       .pad.selected {
-        border: 4px solid white;
+        border: 4px solid #fff;
       }
-
       .pad.recording {
-        border: 3px dashed white;
+        border: 3px dashed #fff;
       }
-
-      .pad.playing {
-        transform: scale(0.96);
-      }
-
+      .pad.playing,
       .pad.holding {
         transform: scale(0.96);
       }
-
+      .padContent {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        pointer-events: none;
+        color: #fff;
+        padding: 8px;
+        mix-blend-mode: difference;
+      }
+      .padName {
+        font-size: 16px;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .recordStatus {
+        margin-top: 6px;
+        font-size: 12px;
+        opacity: 0.7;
+      }
       .padEffectStatus {
         position: absolute;
         left: 8px;
@@ -342,547 +212,376 @@
         top: 6px;
         text-align: center;
         font-size: 10px;
-        color: white;
+        color: #fff;
         opacity: 0.75;
         pointer-events: none;
         mix-blend-mode: difference;
       }
-
-      #canvas.playMode .padEffectStatus {
-        display: block;
-      }
-
-      .padContent {
-        width: 100%;
-        height: 100%;
-
-        display: flex;
-        flex-direction: column;
-
-        align-items: center;
-        justify-content: center;
-
-        text-align: center;
-
-        pointer-events: none;
-
-        color: white;
-
-        padding: 8px;
-      }
-
-      .padName {
-        font-size: 16px;
-
-        max-width: 100%;
-
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .recordStatus {
-        margin-top: 6px;
-
-        font-size: 12px;
-
-        opacity: 0.7;
-      }
-
-      /* =====================================================
-         PAD VOLUME CONTROL
-      ===================================================== */
-
       .padControls {
         position: absolute;
-
         left: 8px;
         right: 8px;
         bottom: 7px;
-
         display: flex;
         align-items: center;
-
         gap: 6px;
-
         z-index: 20;
-
         pointer-events: auto;
-
         touch-action: none;
       }
-
-      .padVolumeLabel {
-        flex-shrink: 0;
-
+      .padVolumeLabel,
+      .padVolumeValue {
         font-size: 10px;
-
-        color: white;
-
-        opacity: 0.8;
-
-        mix-blend-mode: difference;
+        color: #fff;
       }
-
-      .padVolume {
-        flex: 1;
-
-        min-width: 0;
-
-        height: 16px;
-
-        margin: 0;
-
-        accent-color: black;
-
-        cursor: pointer;
-
-        touch-action: auto;
-
-        pointer-events: auto;
-      }
-
       .padVolumeValue {
         width: 34px;
-
-        flex-shrink: 0;
-
-        font-size: 10px;
-
-        color: white;
-
         text-align: right;
-
-        mix-blend-mode: difference;
       }
-
+      .padVolume {
+        flex: 1;
+        min-width: 0;
+        height: 18px;
+        appearance: none;
+        -webkit-appearance: none;
+        background: transparent;
+      }
+      .padVolume::-webkit-slider-runnable-track,
+      #masterVolumeSlider::-webkit-slider-runnable-track {
+        height: 2px;
+        background: #fff;
+      }
+      .padVolume::-webkit-slider-thumb,
+      #masterVolumeSlider::-webkit-slider-thumb {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 10px;
+        height: 10px;
+        margin-top: -4px;
+        border: 0;
+        border-radius: 50%;
+        background: #fff;
+      }
+      .padVolume::-moz-range-track,
+      #masterVolumeSlider::-moz-range-track {
+        height: 2px;
+        background: #fff;
+      }
+      .padVolume::-moz-range-thumb,
+      #masterVolumeSlider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border: 0;
+        border-radius: 50%;
+        background: #fff;
+      }
       #canvas.playMode .padControls {
         display: none;
       }
-
-      /* =====================================================
-         PAD RESIZE
-      ===================================================== */
-
       .resizeHandle {
         position: absolute;
-
-        width: 14px;
-        height: 14px;
-
+        width: 10px;
+        height: 10px;
         right: -2px;
         bottom: -2px;
-
-        background: white;
-
+        background: #fff;
         cursor: nwse-resize;
-
-        touch-action: none;
-
         z-index: 30;
-
         mix-blend-mode: difference;
       }
-
-      /* =====================================================
-         PLAY MODE
-      ===================================================== */
-
       #canvas.playMode .resizeHandle,
-      #canvas.playMode .imageResizeHandle {
-        display: none;
-      }
-
+      #canvas.playMode .imageResizeHandle,
       #canvas.playMode .recordStatus {
         display: none;
       }
-
-      /* =====================================================
-         LOOP AREA
-      ===================================================== */
-
+      #pointerOverlayLayer {
+        position: fixed;
+        inset: 0;
+        z-index: 5000;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .playPointer {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 34px;
+        height: 34px;
+        pointer-events: none;
+        opacity: 0;
+        transform: translate3d(-100px, -100px, 0);
+        will-change: transform, opacity;
+        transform-origin: top left;
+        transition: opacity 90ms ease-out;
+        z-index: 2;
+        mix-blend-mode: difference;
+      }
+      .playPointer.visible {
+        opacity: 1;
+      }
+      .playPointer.fadeOut {
+        opacity: 0;
+        transition: opacity 140ms ease-out;
+      }
+      .playPointer img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter: invert(1);
+        pointer-events: none;
+      }
+      body:not(.playMode) #pointerOverlayLayer {
+        display: none;
+      }
       .loopArea {
         position: fixed;
-
         left: 0;
         right: 0;
         bottom: 0;
-
         min-height: 72px;
-
         padding: 10px 15px calc(10px + env(safe-area-inset-bottom));
-
         display: none;
-
         align-items: center;
-
         gap: 15px;
-
-        background: white;
-
-        border-top: 1px solid black;
-
+        background: transparent;
+        color: #fff;
         z-index: 2000;
-
-        -webkit-transform: translateZ(0);
         transform: translateZ(0);
-
         touch-action: none;
+        mix-blend-mode: difference;
       }
-
+      .loopArea * {
+        mix-blend-mode: normal !important;
+      }
       body.playMode .loopArea {
         display: flex;
       }
-
-      /* =====================================================
-         MASTER VOLUME
-      ===================================================== */
-
       .masterVolume {
         width: 150px;
-
         flex-shrink: 0;
-
         display: flex;
         flex-direction: column;
-
         justify-content: center;
-
         gap: 4px;
       }
-
       .masterHeader {
         display: flex;
         align-items: center;
         justify-content: space-between;
-
         font-size: 11px;
       }
-
-      .masterLabel {
-        font-size: 12px;
-      }
-
       .masterValue {
         font-size: 11px;
-
         opacity: 0.65;
       }
-
       #masterVolumeSlider {
         width: 100%;
-
         height: 18px;
-
-        margin: 0;
-
-        accent-color: black;
-
-        cursor: pointer;
-
-        touch-action: auto;
+        appearance: none;
+        -webkit-appearance: none;
+        background: transparent;
+        border: 0;
       }
-
-      /* =====================================================
-         LOOP BUTTON
-      ===================================================== */
-
       .loopButton {
         width: 80px;
         height: 48px;
-
-        flex-shrink: 0;
-
         padding: 0;
-
         font-size: 14px;
-
-        border: 2px solid black;
-
-        background: white;
-
-        user-select: none;
-        -webkit-user-select: none;
-
-        touch-action: none;
-
-        -webkit-tap-highlight-color: transparent;
+        border: 2px solid #fff;
+        background: transparent;
+        color: #fff;
       }
-
-      .loopButton.recording {
-        background: black;
-        color: white;
-      }
-
       .loopButton.recording::before {
         content: "● ";
       }
-
-      /* =====================================================
-         RESET LOOP
-      ===================================================== */
-
       .resetLoopButton {
         height: 48px;
-
-        flex-shrink: 0;
-
         padding: 0 12px;
-
         font-size: 12px;
-
-        border: 1px solid black;
-
-        background: white;
-
+        border: 1px solid #fff;
+        background: transparent;
+        color: #fff;
         display: none;
-
-        touch-action: none;
       }
-
       .resetLoopButton.visible {
         display: block;
       }
-
-      .resetLoopButton:hover {
-        background: #eee;
-      }
-
-      /* =====================================================
-         LOOP INFO
-      ===================================================== */
-
       .loopInfo {
         width: 100px;
-
-        flex-shrink: 0;
-
         font-size: 12px;
-
         line-height: 1.5;
       }
-
       .loopDuration {
         font-size: 13px;
       }
-
       .loopHint {
         opacity: 0.5;
       }
-
-      /* =====================================================
-         LOOP LAYERS
-      ===================================================== */
-
       .loopLayers {
         flex: 1;
-
         min-width: 0;
-
         display: flex;
-
         align-items: center;
-
         gap: 8px;
-
         overflow-x: auto;
-        overflow-y: hidden;
-
         scrollbar-width: none;
-
-        -webkit-overflow-scrolling: touch;
-
         touch-action: pan-x;
       }
-
-      .loopLayers::-webkit-scrollbar {
-        display: none;
-      }
-
       .loopLayer {
         min-width: 105px;
-
         height: 48px;
-
         display: flex;
-
         align-items: center;
-
         gap: 7px;
-
         padding: 5px 7px;
-
-        border: 1px solid black;
-
-        background: white;
-
+        border: 1px solid #fff;
+        background: transparent;
+        color: #fff;
         flex-shrink: 0;
       }
-
       .loopLayer.muted {
         opacity: 0.35;
       }
-
       .loopLayerName {
         flex: 1;
-
         min-width: 0;
-
         font-size: 12px;
-
         white-space: nowrap;
-
         overflow: hidden;
-
         text-overflow: ellipsis;
       }
-
       .muteButton {
         padding: 5px 7px;
-
         font-size: 11px;
-
-        flex-shrink: 0;
-
-        touch-action: none;
+        border: 1px solid #fff;
+        background: transparent;
+        color: #fff;
       }
-
-      .muteButton.active {
-        background: black;
-        color: white;
-      }
-
-      /* =====================================================
-         RECORDING INDICATOR
-      ===================================================== */
-
       .loopRecordingIndicator {
         position: fixed;
-
         left: 50%;
-
         bottom: calc(85px + env(safe-area-inset-bottom));
-
         transform: translateX(-50%);
-
         padding: 7px 12px;
-
-        background: black;
-        color: white;
-
+        background: transparent;
+        color: #fff;
         font-size: 12px;
-
         z-index: 2100;
-
         display: none;
-
         pointer-events: none;
+        mix-blend-mode: difference;
       }
-
       #canvas.loopRecording .loopRecordingIndicator {
         display: block;
       }
-
-      /* =====================================================
-         HELP
-      ===================================================== */
-
       .help {
         position: absolute;
-
         left: 15px;
         bottom: 15px;
-
         font-size: 12px;
-
+        color: #fff;
         opacity: 0.6;
-
         pointer-events: none;
-
         z-index: 50;
+        mix-blend-mode: difference;
       }
-
       #canvas.playMode .help {
         display: none;
       }
-
-      /* =====================================================
-         SMALL SCREEN
-      ===================================================== */
-
+      .fullscreenButton {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        z-index: 10000;
+        width: 46px;
+        height: 46px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #fff;
+        background: transparent;
+        color: #fff;
+        font-size: 10px;
+        cursor: pointer;
+        mix-blend-mode: difference;
+      }
+      .fullscreenButton:hover {
+        background: #fff;
+        color: #000;
+      }
+      .fullscreenButton:active {
+        transform: scale(0.94);
+      }
+      .fullscreenButton.isFullscreen {
+        font-size: 0;
+      }
+      .fullscreenButton.isFullscreen:before {
+        content: "×";
+        font-size: 20px;
+        font-weight: 300;
+      }
+      body.playMode .toolbar,
+      body.playMode .loopArea,
+      body.playMode .fullscreenButton {
+        opacity: 0.6;
+      }
+      :fullscreen {
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        overflow: hidden !important;
+      }
+      :-webkit-full-screen {
+        width: 100vw !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+      }
       @media (max-width: 800px) {
         .toolbar {
           gap: 6px;
-
           padding-left: 10px;
           padding-right: 10px;
         }
-
-        button {
-          padding: 8px 10px;
-
-          font-size: 13px;
-        }
-
-        #addPad {
-          margin-left: 0;
-        }
-
         .loopArea {
           min-height: 82px;
-
           padding-left: 10px;
           padding-right: 10px;
-
           gap: 8px;
         }
-
         .masterVolume {
           width: 120px;
         }
-
         .loopButton {
           width: 76px;
-          height: 48px;
         }
-
-        .resetLoopButton {
-          padding: 0 8px;
-        }
-
         .loopInfo {
           width: 85px;
         }
-
-        .loopLayers {
-          gap: 6px;
-        }
-
         .loopLayer {
           min-width: 100px;
         }
       }
-
       @media (max-width: 500px) {
         .loopInfo {
           display: none;
         }
-
         .masterVolume {
           width: 105px;
         }
-
         .loopArea {
           gap: 6px;
         }
-
-        .masterLabel {
-          font-size: 11px;
+        .fullscreenButton {
+          right: 10px;
+          bottom: calc(10px + env(safe-area-inset-bottom));
+          width: 42px;
+          height: 42px;
         }
       }
     </style>
   </head>
-
   <body>
     <!-- =====================================================
          TOOLBAR
@@ -902,6 +601,19 @@
       <button id="renamePad">RENAME</button>
 
       <button id="deleteButton">DELETE</button>
+
+      <button id="backgroundColorButton" class="backgroundButton">
+        BG COLOR
+      </button>
+      <button id="backgroundImageButton" class="backgroundButton">
+        BG IMAGE
+      </button>
+      <button id="clearBackgroundButton" class="backgroundButton">
+        CLEAR BG
+      </button>
+
+      <input type="color" id="backgroundColorInput" value="#ffffff" />
+      <input type="file" id="backgroundImageInput" accept="image/*" />
 
       <input
         type="file"
@@ -924,21 +636,48 @@
         multiple
       />
 
-      <input type="file" id="imageInput" accept="image/*" multiple />
+      <input
+        type="file"
+        id="imageInput"
+        accept="image/*,video/*,.mp4,.webm,.mov,.m4v"
+        multiple
+      />
     </div>
+
+    <!-- =====================================================
+         FULLSCREEN BUTTON
+    ===================================================== -->
+    <button
+      id="fullscreenButton"
+      class="fullscreenButton"
+      type="button"
+      aria-label="Toggle fullscreen"
+      title="FULLSCREEN"
+    >
+      FULL
+    </button>
 
     <!-- =====================================================
          CANVAS
     ===================================================== -->
 
     <div id="canvas">
+      <div id="canvasBackground" aria-hidden="true"></div>
+      <!-- =====================================================
+
       <div class="help">
         EDIT：單點預覽・雙擊錄音・拖曳移動・右下角調整大小・PLAY：長按 PAD，左右
         Reverb/Distortion，上下 Frequency
       </div>
+    ===================================================== -->
 
       <div class="loopRecordingIndicator">● RECORDING LOOP</div>
     </div>
+
+    <!-- =====================================================
+           PLAY MODE — MULTI POINTER CURSOR LAYER
+      ===================================================== -->
+    <div id="pointerOverlayLayer" aria-hidden="true"></div>
 
     <!-- =====================================================
          LOOP AREA
@@ -989,6 +728,10 @@
         images: [],
 
         selectedImage: null,
+
+        backgroundColor: "#ffffff",
+        backgroundImageURL: null,
+        backgroundImageElement: null,
 
         nextPadId: 1,
 
@@ -1048,6 +791,9 @@
       ===================================================== */
 
       const canvas = document.getElementById("canvas");
+      const pointerOverlayLayer = document.getElementById(
+        "pointerOverlayLayer",
+      );
 
       const editModeButton = document.getElementById("editMode");
 
@@ -1063,6 +809,23 @@
 
       const deleteButton = document.getElementById("deleteButton");
 
+      const backgroundColorButton = document.getElementById(
+        "backgroundColorButton",
+      );
+      const backgroundImageButton = document.getElementById(
+        "backgroundImageButton",
+      );
+      const clearBackgroundButton = document.getElementById(
+        "clearBackgroundButton",
+      );
+      const backgroundColorInput = document.getElementById(
+        "backgroundColorInput",
+      );
+      const backgroundImageInput = document.getElementById(
+        "backgroundImageInput",
+      );
+      const canvasBackground = document.getElementById("canvasBackground");
+
       const imageInput = document.getElementById("imageInput");
 
       const audioInput = document.getElementById("audioInput");
@@ -1074,10 +837,256 @@
       const loopLayers = document.getElementById("loopLayers");
 
       const loopArea = document.querySelector(".loopArea");
+      const fullscreenButton = document.getElementById("fullscreenButton");
 
       const masterVolumeSlider = document.getElementById("masterVolumeSlider");
 
       const masterVolumeValue = document.getElementById("masterVolumeValue");
+
+      /* =====================================================
+         PLAY MODE — MULTI POINTER CURSOR
+      ===================================================== */
+
+      const playPointers = new Map();
+      const POINTER_CURSOR_SIZE = 34;
+      const POINTER_MAX_SIZE = 110;
+      const POINTER_GROW_DURATION = 5000;
+
+      function createPlayPointer(pointerId) {
+        if (playPointers.has(pointerId)) {
+          return playPointers.get(pointerId);
+        }
+
+        const cursor = document.createElement("div");
+        cursor.className = "playPointer";
+
+        const cursorImage = document.createElement("img");
+        cursorImage.src = "mouse.gif";
+        cursorImage.alt = "";
+        cursorImage.draggable = false;
+        cursor.appendChild(cursorImage);
+
+        pointerOverlayLayer.appendChild(cursor);
+
+        const pointer = {
+          cursor,
+          x: -100,
+          y: -100,
+          visible: false,
+          active: false,
+          fadeTimer: null,
+          pressStartTime: 0,
+          growAnimationFrame: null,
+        };
+
+        playPointers.set(pointerId, pointer);
+        return pointer;
+      }
+
+      function positionPlayPointerElement(
+        element,
+        x,
+        y,
+        size = POINTER_CURSOR_SIZE,
+      ) {
+        // 讓 mouse.gif 的「中心」對準實際滑鼠／手指位置
+        element.style.transform = `
+    translate3d(${x - size / 2}px, ${y - size / 2}px, 0)
+    scale(${size / POINTER_CURSOR_SIZE})
+  `;
+      }
+
+      function updatePlayPointerSize(pointer) {
+        if (!pointer || !pointer.active) return;
+
+        const elapsed = Math.max(0, performance.now() - pointer.pressStartTime);
+        const progress = Math.min(1, elapsed / POINTER_GROW_DURATION);
+
+        // 使用 ease-out：剛開始變化較明顯，接近 5 秒時慢慢接近最大值。
+        const eased = 1 - Math.pow(1 - progress, 2);
+        const size =
+          POINTER_CURSOR_SIZE +
+          (POINTER_MAX_SIZE - POINTER_CURSOR_SIZE) * eased;
+
+        pointer.currentSize = size;
+        positionPlayPointerElement(pointer.cursor, pointer.x, pointer.y, size);
+
+        if (progress < 1 && pointer.active) {
+          pointer.growAnimationFrame = requestAnimationFrame(() =>
+            updatePlayPointerSize(pointer),
+          );
+        } else {
+          pointer.growAnimationFrame = null;
+        }
+      }
+
+      function showPlayPointer(pointerId, x, y) {
+        if (sampler.mode !== "play") {
+          return;
+        }
+
+        const pointer = createPlayPointer(pointerId);
+
+        if (pointer.fadeTimer) {
+          clearTimeout(pointer.fadeTimer);
+          pointer.fadeTimer = null;
+        }
+
+        pointer.x = x;
+        pointer.y = y;
+
+        // 只有第一次按下才重新開始 0 → 最大尺寸的計時。
+        if (!pointer.active) {
+          pointer.active = true;
+          pointer.pressStartTime = performance.now();
+          pointer.currentSize = POINTER_CURSOR_SIZE;
+
+          if (pointer.growAnimationFrame) {
+            cancelAnimationFrame(pointer.growAnimationFrame);
+          }
+          pointer.growAnimationFrame = null;
+        }
+
+        positionPlayPointerElement(
+          pointer.cursor,
+          x,
+          y,
+          pointer.currentSize || POINTER_CURSOR_SIZE,
+        );
+
+        pointer.cursor.classList.remove("fadeOut");
+        pointer.cursor.classList.add("visible");
+        pointer.visible = true;
+
+        // 長按期間持續更新大小；5 秒後維持最大尺寸。
+        if (!pointer.growAnimationFrame) {
+          updatePlayPointerSize(pointer);
+        }
+      }
+
+      function hidePlayPointer(pointerId) {
+        const pointer = playPointers.get(pointerId);
+        if (!pointer) {
+          return;
+        }
+
+        pointer.active = false;
+        pointer.visible = false;
+
+        if (pointer.growAnimationFrame) {
+          cancelAnimationFrame(pointer.growAnimationFrame);
+          pointer.growAnimationFrame = null;
+        }
+
+        pointer.cursor.classList.remove("visible");
+        pointer.cursor.classList.add("fadeOut");
+
+        if (pointer.fadeTimer) {
+          clearTimeout(pointer.fadeTimer);
+        }
+
+        pointer.fadeTimer = setTimeout(() => {
+          if (!playPointers.has(pointerId)) {
+            return;
+          }
+
+          // 放開後移到畫面外，確保之後沒有任何滑鼠 hover 時仍顯示。
+          pointer.cursor.style.transform = "translate3d(-100px, -100px, 0)";
+          pointer.fadeTimer = null;
+        }, 160);
+      }
+
+      function hideAllPlayPointers() {
+        playPointers.forEach((_, pointerId) => {
+          hidePlayPointer(pointerId);
+        });
+      }
+
+      function removeAllPlayPointers() {
+        playPointers.forEach((pointer) => {
+          if (pointer.fadeTimer) {
+            clearTimeout(pointer.fadeTimer);
+          }
+          if (pointer.growAnimationFrame) {
+            cancelAnimationFrame(pointer.growAnimationFrame);
+          }
+          pointer.cursor.remove();
+        });
+        playPointers.clear();
+      }
+
+      /* =====================================================
+         PLAY MODE — POINTER CURSOR
+
+         游標只在「按下 → 長按 → 長按拖曳」期間顯示。
+         放開／取消後快速淡出。
+
+         使用 Pointer Events，因此：
+         - 電腦滑鼠 = 一個 pointer
+         - 一根手指 = 一個 pointer
+         - 三根手指 = 三個獨立 mouse.png
+         - 每個 pointer 都有自己的 active 狀態
+
+         特別注意：pointerup 之後的普通滑鼠移動不會重新顯示游標。
+      ===================================================== */
+      document.addEventListener(
+        "pointerdown",
+        (event) => {
+          if (sampler.mode !== "play") {
+            return;
+          }
+
+          showPlayPointer(event.pointerId, event.clientX, event.clientY);
+        },
+        { passive: true },
+      );
+
+      document.addEventListener(
+        "pointermove",
+        (event) => {
+          if (sampler.mode !== "play") {
+            return;
+          }
+
+          const pointer = playPointers.get(event.pointerId);
+
+          // 沒有按住時完全不顯示 mouse。
+          if (!pointer || !pointer.active) {
+            return;
+          }
+
+          showPlayPointer(event.pointerId, event.clientX, event.clientY);
+        },
+        { passive: true },
+      );
+
+      document.addEventListener(
+        "pointerup",
+        (event) => {
+          if (sampler.mode !== "play") {
+            return;
+          }
+
+          hidePlayPointer(event.pointerId);
+        },
+        { passive: true },
+      );
+
+      document.addEventListener(
+        "pointercancel",
+        (event) => {
+          if (sampler.mode !== "play") {
+            return;
+          }
+
+          hidePlayPointer(event.pointerId);
+        },
+        { passive: true },
+      );
+
+      window.addEventListener("blur", () => {
+        hideAllPlayPointers();
+      });
 
       /* =====================================================
          SETTINGS
@@ -1851,112 +1860,41 @@
        * 只在實際交集區域建立 overlay。
        */
       function createImageInvertOverlay(image, pad) {
-        if (!image || !image.element || !pad || !pad.element) {
-          return null;
-        }
+        if (!image || !image.element || !pad || !pad.element) return null;
 
         removeImageInvertOverlay(image, pad);
 
         const imageRect = image.element.getBoundingClientRect();
-
         const padRect = pad.element.getBoundingClientRect();
 
-        /*
-         * 計算圖片和 PAD 的實際交集。
-         */
-
         const intersectionLeft = Math.max(imageRect.left, padRect.left);
-
         const intersectionTop = Math.max(imageRect.top, padRect.top);
-
         const intersectionRight = Math.min(imageRect.right, padRect.right);
-
         const intersectionBottom = Math.min(imageRect.bottom, padRect.bottom);
-
         const intersectionWidth = intersectionRight - intersectionLeft;
-
         const intersectionHeight = intersectionBottom - intersectionTop;
 
-        /*
-         * 沒有交集。
-         */
-        if (intersectionWidth <= 0 || intersectionHeight <= 0) {
-          return null;
-        }
+        if (intersectionWidth <= 0 || intersectionHeight <= 0) return null;
 
-        /*
-         * overlay 相對於圖片左上角的位置。
-         */
-        const localLeft = intersectionLeft - imageRect.left;
-
-        const localTop = intersectionTop - imageRect.top;
-
-        /*
-         * 建立 inverse overlay。
-         */
         const overlay = document.createElement("div");
-
         overlay.className = "imageInvertOverlay";
-
-        overlay.style.left = localLeft + "px";
-
-        overlay.style.top = localTop + "px";
-
+        overlay.style.left = intersectionLeft - imageRect.left + "px";
+        overlay.style.top = intersectionTop - imageRect.top + "px";
         overlay.style.width = intersectionWidth + "px";
-
         overlay.style.height = intersectionHeight + "px";
 
         /*
-         * overlay 裡面放同一張圖片。
-         */
-        const overlayImage = document.createElement("img");
-
-        overlayImage.src = image.url;
-
-        overlayImage.draggable = false;
-
-        /*
-         * 必須使用圖片實際 pixel 尺寸。
-         */
-        overlayImage.style.width = imageRect.width + "px";
-
-        overlayImage.style.height = imageRect.height + "px";
-
-        /*
-         * 把圖片內容往左／上移，
-         * 讓 overlay 中顯示的部分
-         * 和原圖完全對齊。
-         */
-        overlayImage.style.left = -localLeft + "px";
-
-        overlayImage.style.top = -localTop + "px";
-
-        overlay.appendChild(overlayImage);
-
-        /*
-         * 放入圖片 wrapper。
+         * 不再複製 GIF / video。
+         * 白色 difference layer 直接反相下面「正在播放的原始 media」。
+         * 因此 PAD 點擊 / inverse refresh 不會讓 GIF 或影片重播。
          */
         image.element.appendChild(overlay);
 
-        /*
-         * 建立 Map：
-         *
-         * PAD → overlay
-         */
-        if (!image.invertOverlays) {
-          image.invertOverlays = new Map();
-        }
-
+        if (!image.invertOverlays) image.invertOverlays = new Map();
         image.invertOverlays.set(pad, overlay);
-
         return overlay;
       }
 
-      /*
-       * =====================================================
-       * APPLY PAD IMAGE INVERT
-       * =====================================================
-       */
       function applyPadImageInvert(pad) {
         if (!pad || sampler.mode !== "play") {
           return;
@@ -2610,6 +2548,89 @@
       }
 
       /* =====================================================
+         BACKGROUND
+      ===================================================== */
+
+      function updateCanvasBackground() {
+        if (!canvasBackground) return;
+        canvasBackground.style.backgroundColor =
+          sampler.backgroundColor || "#ffffff";
+
+        if (sampler.backgroundImageURL) {
+          if (!sampler.backgroundImageElement) {
+            const img = document.createElement("img");
+            img.draggable = false;
+            sampler.backgroundImageElement = img;
+            canvasBackground.appendChild(img);
+          }
+          sampler.backgroundImageElement.src = sampler.backgroundImageURL;
+          sampler.backgroundImageElement.style.display = "block";
+        } else if (sampler.backgroundImageElement) {
+          sampler.backgroundImageElement.style.display = "none";
+        }
+      }
+
+      function setBackgroundColor(color) {
+        if (!color) return;
+        sampler.backgroundColor = color;
+        updateCanvasBackground();
+      }
+
+      function setBackgroundImage(file) {
+        if (!file) return;
+        if (sampler.backgroundImageURL) {
+          try {
+            URL.revokeObjectURL(sampler.backgroundImageURL);
+          } catch (error) {}
+        }
+        sampler.backgroundImageURL = URL.createObjectURL(file);
+        updateCanvasBackground();
+      }
+
+      function clearBackground() {
+        if (sampler.backgroundImageURL) {
+          try {
+            URL.revokeObjectURL(sampler.backgroundImageURL);
+          } catch (error) {}
+        }
+        sampler.backgroundImageURL = null;
+        sampler.backgroundColor = "#ffffff";
+        backgroundColorInput.value = "#ffffff";
+        updateCanvasBackground();
+      }
+
+      backgroundColorButton.addEventListener("click", () => {
+        if (sampler.mode !== "edit") return;
+        backgroundColorInput.value = sampler.backgroundColor || "#ffffff";
+        backgroundColorInput.click();
+      });
+
+      backgroundColorInput.addEventListener("input", (event) => {
+        event.stopPropagation();
+        setBackgroundColor(event.target.value);
+      });
+
+      backgroundImageButton.addEventListener("click", () => {
+        if (sampler.mode !== "edit") return;
+        backgroundImageInput.value = "";
+        backgroundImageInput.click();
+      });
+
+      backgroundImageInput.addEventListener("change", (event) => {
+        if (sampler.mode !== "edit") return;
+        const file = event.target.files?.[0];
+        if (file) setBackgroundImage(file);
+        backgroundImageInput.value = "";
+      });
+
+      clearBackgroundButton.addEventListener("click", () => {
+        if (sampler.mode !== "edit") return;
+        clearBackground();
+      });
+
+      updateCanvasBackground();
+
+      /* =====================================================
          IMAGE
       ===================================================== */
 
@@ -2634,37 +2655,29 @@
       });
 
       function createImage(file) {
+        if (!file) return;
+
         const id = sampler.nextImageId++;
+        const url = URL.createObjectURL(file);
+        const isVideo =
+          file.type.startsWith("video/") ||
+          /\.(mp4|webm|mov|m4v)$/i.test(file.name);
 
         const image = {
           id,
-
           x: 10 + Math.random() * 30,
-
           y: 10 + Math.random() * 30,
-
           width: 30,
-
           height: 30,
-
-          url: URL.createObjectURL(file),
-
+          url,
+          mediaType: isVideo ? "video" : "image",
           element: null,
-
-          /*
-           * Map：
-           *
-           * PAD → inverse overlay
-           *
-           * 允許多個 PAD 同時作用。
-           */
+          mediaElement: null,
           invertOverlays: new Map(),
         };
 
         sampler.images.push(image);
-
         renderImage(image);
-
         selectImage(image);
       }
 
@@ -2674,51 +2687,63 @@
 
       function renderImage(image) {
         const wrapper = document.createElement("div");
-
         wrapper.className = "imageItem";
-
         wrapper.style.left = image.x + "%";
-
         wrapper.style.top = image.y + "%";
-
         wrapper.style.width = image.width + "%";
-
         wrapper.style.height = image.height + "%";
 
-        const img = document.createElement("img");
+        let media;
 
-        img.src = image.url;
+        if (image.mediaType === "video") {
+          media = document.createElement("video");
+          media.src = image.url;
+          media.autoplay = true;
+          media.loop = true;
+          media.muted = true;
+          media.defaultMuted = true;
+          media.playsInline = true;
+          media.preload = "auto";
+          media.controls = false;
+          media.setAttribute("autoplay", "");
+          media.setAttribute("loop", "");
+          media.setAttribute("muted", "");
+          media.setAttribute("playsinline", "");
+          media.addEventListener("loadeddata", () =>
+            media.play().catch(() => {}),
+          );
+          media.addEventListener("canplay", () => {
+            if (media.paused) media.play().catch(() => {});
+          });
+        } else {
+          /* 一個原始 img 同時負責照片與 GIF，絕不因 PAD inverse 重建。 */
+          media = document.createElement("img");
+          media.src = image.url;
+          media.draggable = false;
+        }
 
-        img.draggable = false;
+        media.className = "imageMedia";
+        media.draggable = false;
+        media.style.width = "100%";
+        media.style.height = "100%";
+        media.style.objectFit = "fill";
+        media.style.pointerEvents = "none";
+        media.style.display = "block";
 
-        img.style.width = "100%";
-
-        img.style.height = "100%";
-
-        img.style.objectFit = "fill";
-
-        img.style.pointerEvents = "none";
-
-        /*
-         * Resize handle。
-         */
         const resizeHandle = document.createElement("div");
-
         resizeHandle.className = "imageResizeHandle";
 
-        wrapper.appendChild(img);
-
+        wrapper.appendChild(media);
         wrapper.appendChild(resizeHandle);
-
         canvas.appendChild(wrapper);
 
         image.element = wrapper;
-
-        if (!image.invertOverlays) {
-          image.invertOverlays = new Map();
-        }
+        image.mediaElement = media;
+        if (!image.invertOverlays) image.invertOverlays = new Map();
 
         setupImageInteraction(image, wrapper, resizeHandle);
+
+        if (image.mediaType === "video") media.play().catch(() => {});
       }
 
       function updateImage(image) {
@@ -2909,6 +2934,14 @@
               pad.invertedImages.delete(image);
             }
           });
+
+          if (image.mediaElement && image.mediaType === "video") {
+            try {
+              image.mediaElement.pause();
+              image.mediaElement.removeAttribute("src");
+              image.mediaElement.load();
+            } catch (error) {}
+          }
 
           if (image.url) {
             URL.revokeObjectURL(image.url);
@@ -3142,14 +3175,75 @@
          - 中央正方形不會畫出來，只作為控制基準區
       ===================================================== */
 
-      // 隱形中央控制正方形的半邊大小（px）
-      // 越大，越容易維持乾聲／原始頻率。
-      const EFFECT_NEUTRAL_HALF = 75;
+      /*
+       * =====================================================
+       * RESPONSIVE EFFECT CONTROL
+       * =====================================================
+       *
+       * 原點永遠是「目前 PAD 的中心」。
+       *
+       * 中央 neutral zone 不再固定 75px，而是依裝置類型調整：
+       * - 手機／小型觸控裝置：約 52px × 52px
+       * - 桌機／滑鼠：約 44px × 44px
+       *
+       * EFFECT_X_RANGE / EFFECT_Y_RANGE 也不再是固定 pixel。
+       * 它們會依目前 canvas 尺寸重新計算，讓效果區跟著螢幕大小縮放。
+       *
+       * 注意：這裡只改「座標 → 效果數值」的尺度，
+       * 原本 X/Y 的手勢邏輯完全不變：
+       * 左 = Reverb、右 = Distortion、上 = 高頻、下 = 低頻。
+       */
 
-      // 從中央基準區到效果最大值所需要移動的距離。
-      // 調大會讓效果變化更慢、更細。
-      const EFFECT_X_RANGE = 420;
-      const EFFECT_Y_RANGE = 340;
+      function getEffectControlSettings() {
+        const width = Math.max(1, canvas.clientWidth);
+        const height = Math.max(1, canvas.clientHeight);
+
+        const shortSide = Math.min(width, height);
+
+        const hasCoarsePointer =
+          window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+
+        const mobileUserAgent = /Android|iPhone|iPod|Windows Phone/i.test(
+          navigator.userAgent,
+        );
+
+        const isSmallTouchDevice =
+          (hasCoarsePointer || mobileUserAgent) && shortSide <= 900;
+
+        if (isSmallTouchDevice) {
+          /*
+           * 手機：中央區稍微比一般手指接觸範圍大一點。
+           * 最大效果距離也壓低，避免手機上要拖很遠才到最大值。
+           */
+          const neutralHalf = 26;
+
+          const xRange = Math.max(120, Math.min(220, width * 0.45));
+          const yRange = Math.max(120, Math.min(240, height * 0.45));
+
+          return {
+            neutralHalf,
+            xRange,
+            yRange,
+            isSmallTouchDevice: true,
+          };
+        }
+
+        /*
+         * 桌機：使用稍小的中央乾聲區，
+         * 並依 canvas 尺寸彈性調整最大效果距離。
+         */
+        const neutralHalf = 22;
+
+        const xRange = Math.max(260, Math.min(520, width * 0.45));
+        const yRange = Math.max(220, Math.min(440, height * 0.45));
+
+        return {
+          neutralHalf,
+          xRange,
+          yRange,
+          isSmallTouchDevice: false,
+        };
+      }
 
       // 頻率變化範圍。刻意縮小，避免一點點移動就變很多。
       const MIN_PLAYBACK_RATE = 0.72;
@@ -3195,42 +3289,45 @@
       }
 
       function getPadEffectState(pad, currentX, currentY) {
+        /*
+         * 原點 = PAD 中心。
+         * pointerdown 時記錄的 holdStartX / holdStartY
+         * 就是這次手勢的起點，因此這裡不改原本手勢邏輯。
+         */
         const dx = currentX - pad.holdStartX;
         const dy = currentY - pad.holdStartY;
 
+        const settings = getEffectControlSettings();
+        const neutralHalf = settings.neutralHalf;
+        const effectXRange = settings.xRange;
+        const effectYRange = settings.yRange;
+
         /*
-         * 中央隱形正方形：
-         * |dx| <= EFFECT_NEUTRAL_HALF 且 |dy| <= EFFECT_NEUTRAL_HALF
-         * 時完全不加效果，frequency = 1。
+         * 中央隱形方形：
+         * |dx| <= neutralHalf 且 |dy| <= neutralHalf
+         * 時完全保持乾聲／原始頻率。
+         *
+         * 這個範圍現在會依裝置大小改變，
+         * 但仍然以 PAD 中心為原點。
          */
-        const horizontalDistance = Math.max(
-          0,
-          Math.abs(dx) - EFFECT_NEUTRAL_HALF,
-        );
-        const verticalDistance = Math.max(
-          0,
-          Math.abs(dy) - EFFECT_NEUTRAL_HALF,
-        );
+        const horizontalDistance = Math.max(0, Math.abs(dx) - neutralHalf);
+        const verticalDistance = Math.max(0, Math.abs(dy) - neutralHalf);
 
         // 左邊只增加 Reverb，右邊只增加 Distortion。
         const reverb =
-          dx < -EFFECT_NEUTRAL_HALF
-            ? clamp01(horizontalDistance / EFFECT_X_RANGE)
-            : 0;
+          dx < -neutralHalf ? clamp01(horizontalDistance / effectXRange) : 0;
 
         const distortion =
-          dx > EFFECT_NEUTRAL_HALF
-            ? clamp01(horizontalDistance / EFFECT_X_RANGE)
-            : 0;
+          dx > neutralHalf ? clamp01(horizontalDistance / effectXRange) : 0;
 
         // 上方提高頻率，下方降低頻率。
         let playbackRate = 1;
 
-        if (dy < -EFFECT_NEUTRAL_HALF) {
-          const amount = clamp01(verticalDistance / EFFECT_Y_RANGE);
+        if (dy < -neutralHalf) {
+          const amount = clamp01(verticalDistance / effectYRange);
           playbackRate = 1 + amount * (MAX_PLAYBACK_RATE - 1);
-        } else if (dy > EFFECT_NEUTRAL_HALF) {
-          const amount = clamp01(verticalDistance / EFFECT_Y_RANGE);
+        } else if (dy > neutralHalf) {
+          const amount = clamp01(verticalDistance / effectYRange);
           playbackRate = 1 - amount * (1 - MIN_PLAYBACK_RATE);
         }
 
@@ -4181,6 +4278,9 @@
         renamePadButton.style.display = "none";
 
         deleteButton.style.display = "none";
+        backgroundColorButton.style.display = "none";
+        backgroundImageButton.style.display = "none";
+        clearBackgroundButton.style.display = "none";
 
         document.body.classList.add("playMode");
 
@@ -4235,6 +4335,8 @@
 
         sampler.mode = "edit";
 
+        removeAllPlayPointers();
+
         sampler.spacePressed = false;
 
         sampler.loopPressing = false;
@@ -4264,6 +4366,9 @@
         renamePadButton.style.display = "block";
 
         deleteButton.style.display = "block";
+        backgroundColorButton.style.display = "block";
+        backgroundImageButton.style.display = "block";
+        clearBackgroundButton.style.display = "block";
       }
 
       /* =====================================================
@@ -4304,6 +4409,113 @@
          */
         refreshAllPadImageInverts();
       });
+
+      /* =====================================================
+         FULLSCREEN
+         優先使用標準 Fullscreen API；Safari/WebKit 則使用前綴版本。
+         注意：iPhone Safari 目前仍不允許一般網頁把「整個互動頁面」
+         透過 element.requestFullscreen() 真正全螢幕，因此那裡會保留瀏覽器 UI。
+      ===================================================== */
+
+      function getFullscreenElement() {
+        return (
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement ||
+          null
+        );
+      }
+
+      async function enterFullscreen() {
+        const element = document.documentElement;
+
+        try {
+          if (element.requestFullscreen) {
+            await element.requestFullscreen({ navigationUI: "hide" });
+            return true;
+          }
+
+          if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+            return true;
+          }
+
+          if (element.mozRequestFullScreen) {
+            element.mozRequestFullScreen();
+            return true;
+          }
+
+          if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+            return true;
+          }
+        } catch (error) {
+          // 使用者拒絕或瀏覽器限制時，不中斷 sampler。
+          console.warn("Fullscreen request was rejected:", error);
+        }
+
+        return false;
+      }
+
+      async function exitFullscreen() {
+        try {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+            return;
+          }
+
+          if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+            return;
+          }
+
+          if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+            return;
+          }
+
+          if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          }
+        } catch (error) {
+          console.warn("Fullscreen exit failed:", error);
+        }
+      }
+
+      function updateFullscreenButton() {
+        const active = !!getFullscreenElement();
+        fullscreenButton.classList.toggle("isFullscreen", active);
+        fullscreenButton.textContent = active ? "" : "FULL";
+        fullscreenButton.setAttribute(
+          "aria-label",
+          active ? "Exit fullscreen" : "Enter fullscreen",
+        );
+        fullscreenButton.title = active ? "EXIT FULLSCREEN" : "FULLSCREEN";
+      }
+
+      fullscreenButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (getFullscreenElement()) {
+          await exitFullscreen();
+        } else {
+          await enterFullscreen();
+        }
+
+        updateFullscreenButton();
+      });
+
+      document.addEventListener("fullscreenchange", updateFullscreenButton);
+      document.addEventListener(
+        "webkitfullscreenchange",
+        updateFullscreenButton,
+      );
+      document.addEventListener("mozfullscreenchange", updateFullscreenButton);
+      document.addEventListener("MSFullscreenChange", updateFullscreenButton);
+
+      updateFullscreenButton();
 
       /* =====================================================
          PAGE VISIBILITY
