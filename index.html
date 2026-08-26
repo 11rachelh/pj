@@ -48,15 +48,36 @@
         padding: 10px 15px;
         background: transparent;
         z-index: 1000;
-        overflow-x: auto;
-        overflow-y: hidden;
-        touch-action: pan-x;
+        overflow: hidden;
+        touch-action: none;
         mix-blend-mode: difference;
       }
       .toolbar * {
         mix-blend-mode: normal !important;
       }
-      button {
+      .toolbarActions {
+        margin-left: auto;
+        min-width: 0;
+        max-width: calc(100% - 105px);
+        height: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        flex-shrink: 1;
+      }
+      .toolbarActions::-webkit-scrollbar {
+        display: none;
+      }
+      .toolbarActions > * {
+        flex-shrink: 0;
+      }
+      button,
+      label {
         flex-shrink: 0;
         border: 1px solid #fff;
         background: transparent;
@@ -66,11 +87,13 @@
         font-size: 14px;
         cursor: pointer;
       }
-      button:hover {
+      button:hover,
+      label:hover {
         background: #fff;
         color: #000;
       }
-      button:active {
+      button:active,
+      label:active {
         transform: scale(0.94);
       }
       .toolbar button:hover,
@@ -80,15 +103,26 @@
       }
       .backgroundButton {
         display: none;
+        padding: 8px 14px;
+        font-size: 14px;
+        color: #fff;
+        cursor: pointer;
+        line-height: normal;
       }
       body:not(.playMode) .backgroundButton {
         display: block;
       }
       #imageInput,
       #audioInput,
-      #backgroundImageInput,
-      #backgroundColorInput {
+      #backgroundImageInput {
         position: fixed;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+      #backgroundColorInput {
+        position: absolute;
         width: 1px;
         height: 1px;
         opacity: 0;
@@ -120,6 +154,8 @@
       .imageItem {
         position: absolute;
         user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
         touch-action: none;
         cursor: pointer;
         z-index: 2;
@@ -143,6 +179,56 @@
         background: #fff;
         mix-blend-mode: difference;
         touch-action: none;
+        --flash-duration: 1s;
+      }
+      .imageInvertOverlay.visualFlash {
+        animation: padInverseFlash var(--flash-duration) steps(1, end) infinite;
+      }
+      @keyframes padInverseFlash {
+        0%,
+        49% {
+          opacity: 1;
+        }
+        50%,
+        100% {
+          opacity: 0;
+        }
+      }
+      .padVisualBlur {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        width: 100%;
+        height: 100%;
+        display: block;
+        pointer-events: none;
+        opacity: 0;
+        filter: blur(0px) invert(1);
+        -webkit-filter: blur(0px) invert(1);
+        transform: scale(1.04);
+        transform-origin: center;
+        will-change: filter, opacity;
+      }
+      .padVisualGlitch {
+        position: absolute;
+        inset: 0;
+        z-index: 6;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: hidden;
+        mix-blend-mode: normal;
+        opacity: 0;
+        will-change: transform, opacity;
+        clip-path: inset(0);
+      }
+      .padVisualGlitchCanvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        image-rendering: auto;
       }
       .imageResizeHandle {
         position: absolute;
@@ -159,6 +245,9 @@
         position: absolute;
         width: 15%;
         height: 15%;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
         background: transparent;
         border: 2px solid #fff;
         border-radius: 0;
@@ -527,6 +616,18 @@
       body.playMode .fullscreenButton {
         opacity: 0.6;
       }
+      body.playMode,
+      body.playMode * {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        -webkit-touch-callout: none !important;
+        -webkit-user-drag: none !important;
+      }
+      body.playMode img,
+      body.playMode video {
+        pointer-events: none !important;
+        -webkit-user-drag: none !important;
+      }
       :fullscreen {
         width: 100vw !important;
         height: 100vh !important;
@@ -543,6 +644,10 @@
           gap: 6px;
           padding-left: 10px;
           padding-right: 10px;
+        }
+        .toolbarActions {
+          max-width: calc(100% - 96px);
+          gap: 6px;
         }
         .loopArea {
           min-height: 82px;
@@ -592,33 +697,38 @@
 
       <button id="playMode" class="modeButton">PLAY</button>
 
-      <button id="addPad">+ PAD</button>
+      <div class="toolbarActions">
+        <button id="addPad">+ PAD</button>
 
-      <button id="importPad">IMPORT PAD</button>
+        <button id="importPad">IMPORT PAD</button>
 
-      <button id="addImage">+ IMAGE</button>
+        <button id="addImage">+ IMAGE</button>
 
-      <button id="renamePad">RENAME</button>
+        <button id="renamePad">RENAME</button>
 
-      <button id="deleteButton">DELETE</button>
+        <button id="deleteButton">DELETE</button>
 
-      <button id="backgroundColorButton" class="backgroundButton">
-        BG COLOR
-      </button>
-      <button id="backgroundImageButton" class="backgroundButton">
-        BG IMAGE
-      </button>
-      <button id="clearBackgroundButton" class="backgroundButton">
-        CLEAR BG
-      </button>
+        <label
+          id="backgroundColorButton"
+          class="backgroundButton"
+          for="backgroundColorInput"
+        >
+          BG COLOR
+        </label>
+        <button id="backgroundImageButton" class="backgroundButton">
+          BG IMAGE
+        </button>
+        <button id="clearBackgroundButton" class="backgroundButton">
+          CLEAR BG
+        </button>
 
-      <input type="color" id="backgroundColorInput" value="#ffffff" />
-      <input type="file" id="backgroundImageInput" accept="image/*" />
+        <input type="color" id="backgroundColorInput" value="#ffffff" />
+        <input type="file" id="backgroundImageInput" accept="image/*" />
 
-      <input
-        type="file"
-        id="audioInput"
-        accept="
+        <input
+          type="file"
+          id="audioInput"
+          accept="
           .mp3,
           .m4a,
           .wav,
@@ -633,15 +743,16 @@
           audio/aac,
           audio/aiff
         "
-        multiple
-      />
+          multiple
+        />
 
-      <input
-        type="file"
-        id="imageInput"
-        accept="image/*,video/*,.mp4,.webm,.mov,.m4v"
-        multiple
-      />
+        <input
+          type="file"
+          id="imageInput"
+          accept="image/*,video/*,.mp4,.webm,.mov,.m4v"
+          multiple
+        />
+      </div>
     </div>
 
     <!-- =====================================================
@@ -1089,6 +1200,178 @@
       });
 
       /* =====================================================
+         MOBILE PLAY MODE — DISABLE TEXT SELECTION / SHARE UI
+      ===================================================== */
+
+      ["contextmenu", "selectstart", "dragstart", "copy", "cut"].forEach(
+        (type) => {
+          document.addEventListener(
+            type,
+            (event) => {
+              if (sampler.mode === "play") {
+                event.preventDefault();
+              }
+            },
+            { passive: false },
+          );
+        },
+      );
+
+      document.addEventListener(
+        "gesturestart",
+        (event) => {
+          if (sampler.mode === "play") {
+            event.preventDefault();
+          }
+        },
+        { passive: false },
+      );
+
+      /* =====================================================
+         EDIT MODE — TWO-FINGER PINCH TO RESIZE SELECTED PAD / IMAGE
+      ===================================================== */
+
+      const editTouchPointers = new Map();
+      let pinchState = null;
+      let pinchJustEndedAt = 0;
+
+      function getPinchDistance(a, b) {
+        return Math.hypot(b.x - a.x, b.y - a.y);
+      }
+
+      function getPinchTargetFromElement(element) {
+        if (!element) return null;
+        if (element.classList.contains("pad"))
+          return { type: "pad", object: sampler.selectedPad, element };
+        if (element.classList.contains("imageItem"))
+          return { type: "image", object: sampler.selectedImage, element };
+        return null;
+      }
+
+      function beginPinchIfPossible() {
+        if (sampler.mode !== "edit" || editTouchPointers.size < 2 || pinchState)
+          return;
+
+        const points = Array.from(editTouchPointers.values());
+        const first = points[0];
+        const second = points[1];
+        if (!first.target || first.target !== second.target) return;
+
+        const target = first.target;
+        if (!target.object || target.object.element !== target.element) return;
+
+        const object = target.object;
+        const centerX =
+          target.type === "pad"
+            ? object.x + object.width / 2
+            : object.x + object.width / 2;
+        const centerY =
+          target.type === "pad"
+            ? object.y + object.height / 2
+            : object.y + object.height / 2;
+
+        pinchState = {
+          target,
+          ids: [first.id, second.id],
+          startDistance: Math.max(1, getPinchDistance(first, second)),
+          startWidth: object.width,
+          startHeight: object.height,
+          centerX,
+          centerY,
+        };
+
+        if (target.type === "pad") {
+          selectPad(object);
+        } else {
+          selectImage(object);
+        }
+      }
+
+      function updatePinch() {
+        if (!pinchState) return;
+        const a = editTouchPointers.get(pinchState.ids[0]);
+        const b = editTouchPointers.get(pinchState.ids[1]);
+        if (!a || !b) return;
+
+        const distance = Math.max(1, getPinchDistance(a, b));
+        const scale = distance / pinchState.startDistance;
+        const object = pinchState.target.object;
+
+        object.width = Math.max(
+          3,
+          Math.min(200, pinchState.startWidth * scale),
+        );
+        object.height = Math.max(
+          3,
+          Math.min(200, pinchState.startHeight * scale),
+        );
+        object.x = pinchState.centerX - object.width / 2;
+        object.y = pinchState.centerY - object.height / 2;
+
+        if (pinchState.target.type === "pad") {
+          updatePad(object);
+        } else {
+          updateImage(object);
+        }
+      }
+
+      document.addEventListener(
+        "pointerdown",
+        (event) => {
+          if (sampler.mode !== "edit" || event.pointerType !== "touch") return;
+          const element = event.target.closest?.(".pad, .imageItem");
+          if (!element) return;
+
+          if (
+            element.classList.contains("pad") &&
+            event.target.closest(".padControls")
+          )
+            return;
+          const target = getPinchTargetFromElement(element);
+          if (!target) return;
+
+          editTouchPointers.set(event.pointerId, {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            target,
+          });
+          beginPinchIfPossible();
+        },
+        { passive: false, capture: true },
+      );
+
+      document.addEventListener(
+        "pointermove",
+        (event) => {
+          const point = editTouchPointers.get(event.pointerId);
+          if (!point) return;
+          point.x = event.clientX;
+          point.y = event.clientY;
+          if (pinchState && pinchState.ids.includes(event.pointerId)) {
+            event.preventDefault();
+            updatePinch();
+          }
+        },
+        { passive: false, capture: true },
+      );
+
+      function endEditTouchPointer(event) {
+        editTouchPointers.delete(event.pointerId);
+        if (pinchState && pinchState.ids.includes(event.pointerId)) {
+          pinchState = null;
+          pinchJustEndedAt = performance.now();
+        }
+      }
+
+      document.addEventListener("pointerup", endEditTouchPointer, {
+        capture: true,
+      });
+      document.addEventListener("pointercancel", endEditTouchPointer, {
+        capture: true,
+      });
+
+      /* =====================================================
          SETTINGS
       ===================================================== */
 
@@ -1488,6 +1771,14 @@
 
           // 是否已離開中央乾聲區；第一次進入效果區時會立即換掉原本的乾聲 source。
           holdEffectZoneActive: false,
+
+          // VISUAL EFFECTS
+          visualBlur: 0,
+          visualGlitch: 0,
+          visualFlashHz: 0,
+          visualFrame: null,
+          visualLastFrameTime: 0,
+          visualGlitchElements: new Map(),
         };
 
         sampler.pads.push(pad);
@@ -1842,6 +2133,9 @@
         const overlay = image.invertOverlays.get(pad);
 
         if (overlay) {
+          if (overlay._glitchElement) {
+            overlay._glitchElement.remove();
+          }
           overlay.remove();
         }
 
@@ -1883,16 +2177,308 @@
         overlay.style.width = intersectionWidth + "px";
         overlay.style.height = intersectionHeight + "px";
 
-        /*
-         * 不再複製 GIF / video。
-         * 白色 difference layer 直接反相下面「正在播放的原始 media」。
-         * 因此 PAD 點擊 / inverse refresh 不會讓 GIF 或影片重播。
-         */
+        overlay.style.setProperty("--flash-duration", "1s");
+
         image.element.appendChild(overlay);
 
         if (!image.invertOverlays) image.invertOverlays = new Map();
         image.invertOverlays.set(pad, overlay);
         return overlay;
+      }
+
+      function getPadOverlayElements(pad) {
+        const result = [];
+        if (!pad || !pad.invertedImages) return result;
+
+        pad.invertedImages.forEach((image) => {
+          const overlay = image.invertOverlays?.get(pad);
+          if (overlay) result.push({ image, overlay });
+        });
+        return result;
+      }
+
+      function getMediaSourceSize(media) {
+        return {
+          width:
+            media?.videoWidth || media?.naturalWidth || media?.clientWidth || 0,
+          height:
+            media?.videoHeight ||
+            media?.naturalHeight ||
+            media?.clientHeight ||
+            0,
+        };
+      }
+
+      function drawMediaCropToCanvas(image, overlay, canvasElement) {
+        const media = image?.mediaElement;
+        if (!media || !canvasElement || !overlay) return false;
+
+        const rect = overlay.getBoundingClientRect();
+        const imageRect = image.element.getBoundingClientRect();
+        const source = getMediaSourceSize(media);
+
+        if (
+          !source.width ||
+          !source.height ||
+          !imageRect.width ||
+          !imageRect.height
+        ) {
+          return false;
+        }
+
+        const w = Math.max(1, Math.round(rect.width));
+        const h = Math.max(1, Math.round(rect.height));
+
+        if (canvasElement.width !== w || canvasElement.height !== h) {
+          canvasElement.width = w;
+          canvasElement.height = h;
+        }
+
+        const ctx = canvasElement.getContext("2d");
+        if (!ctx) return false;
+
+        const sx = Math.max(
+          0,
+          ((rect.left - imageRect.left) / imageRect.width) * source.width,
+        );
+        const sy = Math.max(
+          0,
+          ((rect.top - imageRect.top) / imageRect.height) * source.height,
+        );
+        const sw = Math.min(
+          source.width - sx,
+          (rect.width / imageRect.width) * source.width,
+        );
+        const sh = Math.min(
+          source.height - sy,
+          (rect.height / imageRect.height) * source.height,
+        );
+
+        if (sw <= 0 || sh <= 0) return false;
+
+        try {
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(media, sx, sy, sw, sh, 0, 0, w, h);
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function setPadVisualEffect(pad, blurAmount, glitchAmount, flashHz) {
+        if (!pad) return;
+
+        pad.visualBlur = blurAmount;
+        pad.visualGlitch = glitchAmount;
+        pad.visualFlashHz = flashHz;
+
+        getPadOverlayElements(pad).forEach(({ image, overlay }) => {
+          overlay.style.setProperty(
+            "--flash-duration",
+            `${1 / Math.max(0.05, flashHz)}s`,
+          );
+
+          if (flashHz > 0.05) {
+            overlay.classList.add("visualFlash");
+            overlay.style.setProperty("--flash-duration", `${1 / flashHz}s`);
+          } else {
+            overlay.classList.remove("visualFlash");
+            overlay.style.opacity = "1";
+          }
+
+          const blurCanvas = ensurePadBlurCanvas(pad, image, overlay);
+          if (blurCanvas) {
+            blurCanvas.style.opacity = blurAmount > 0.01 ? "1" : "0";
+            blurCanvas.style.filter = `blur(${blurAmount}px) invert(1)`;
+            blurCanvas.style.webkitFilter = `blur(${blurAmount}px) invert(1)`;
+            if (blurAmount > 0.01) {
+              drawMediaCropToCanvas(image, overlay, blurCanvas);
+            }
+          }
+
+          if (glitchAmount > 0.01) {
+            ensurePadGlitchCanvas(pad, image, overlay);
+            const glitch = image.invertOverlays?.get(pad)?._glitchElement;
+            if (glitch)
+              glitch.style.opacity = String(Math.min(1, glitchAmount));
+          } else {
+            const glitch = image.invertOverlays?.get(pad)?._glitchElement;
+            if (glitch) glitch.style.opacity = "0";
+          }
+        });
+
+        if (glitchAmount > 0.01 || blurAmount > 0.01) {
+          startPadVisualGlitchLoop(pad);
+        } else {
+          stopPadVisualGlitchLoop(pad);
+        }
+      }
+
+      function ensurePadBlurCanvas(pad, image, overlay) {
+        if (overlay._blurCanvas) return overlay._blurCanvas;
+
+        const canvasElement = document.createElement("canvas");
+        canvasElement.className = "padVisualBlur";
+        overlay.appendChild(canvasElement);
+
+        overlay._blurCanvas = canvasElement;
+        overlay._blurImage = image;
+        overlay._blurPad = pad;
+        return canvasElement;
+      }
+
+      function ensurePadGlitchCanvas(pad, image, overlay) {
+        if (overlay._glitchElement) return overlay._glitchElement;
+
+        const glitch = document.createElement("div");
+        glitch.className = "padVisualGlitch";
+
+        const canvasElement = document.createElement("canvas");
+        canvasElement.className = "padVisualGlitchCanvas";
+        glitch.appendChild(canvasElement);
+        overlay.appendChild(glitch);
+
+        overlay._glitchElement = glitch;
+        overlay._glitchCanvas = canvasElement;
+        overlay._glitchImage = image;
+        overlay._glitchPad = pad;
+        return glitch;
+      }
+
+      function renderPadVisual(pad, timestamp = performance.now()) {
+        if (!pad || !pad.holding || sampler.mode !== "play") return;
+        if (pad.visualGlitch <= 0.01 && pad.visualBlur <= 0.01) return;
+
+        const entries = getPadOverlayElements(pad);
+        const amount = pad.visualGlitch;
+
+        entries.forEach(({ image, overlay }) => {
+          if (pad.visualBlur > 0.01 && overlay._blurCanvas) {
+            drawMediaCropToCanvas(image, overlay, overlay._blurCanvas);
+          }
+
+          if (amount <= 0.01) return;
+
+          const glitch = overlay._glitchElement;
+          const c = overlay._glitchCanvas;
+          const media = image.mediaElement;
+          if (!glitch || !c || !media) return;
+
+          const rect = overlay.getBoundingClientRect();
+          const w = Math.max(1, Math.round(rect.width));
+          const h = Math.max(1, Math.round(rect.height));
+
+          if (c.width !== w || c.height !== h) {
+            c.width = w;
+            c.height = h;
+          }
+
+          const ctx = c.getContext("2d", { willReadFrequently: true });
+          if (!ctx) return;
+
+          const source = getMediaSourceSize(media);
+          const imageRect = image.element.getBoundingClientRect();
+          if (
+            !source.width ||
+            !source.height ||
+            !imageRect.width ||
+            !imageRect.height
+          )
+            return;
+
+          const sx = Math.max(
+            0,
+            ((rect.left - imageRect.left) / imageRect.width) * source.width,
+          );
+          const sy = Math.max(
+            0,
+            ((rect.top - imageRect.top) / imageRect.height) * source.height,
+          );
+          const sw = Math.min(
+            source.width - sx,
+            (rect.width / imageRect.width) * source.width,
+          );
+          const sh = Math.min(
+            source.height - sy,
+            (rect.height / imageRect.height) * source.height,
+          );
+          if (sw <= 0 || sh <= 0) return;
+
+          try {
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(media, sx, sy, sw, sh, 0, 0, w, h);
+
+            const data = ctx.getImageData(0, 0, w, h);
+            const src = data.data;
+            const original = new Uint8ClampedArray(src);
+            const maxShift = Math.max(1, Math.round(2 + amount * 18));
+            const sliceCount = Math.max(3, Math.round(3 + amount * 10));
+
+            for (let slice = 0; slice < sliceCount; slice++) {
+              const y0 = Math.floor((slice / sliceCount) * h);
+              const y1 = Math.floor(((slice + 1) / sliceCount) * h);
+              const shift = Math.round((Math.random() * 2 - 1) * maxShift);
+
+              for (let y = y0; y < y1; y++) {
+                for (let x = 0; x < w; x++) {
+                  const i = (y * w + x) * 4;
+                  const rX = Math.max(0, Math.min(w - 1, x + shift));
+                  const bX = Math.max(0, Math.min(w - 1, x - shift));
+                  const rI = (y * w + rX) * 4;
+                  const bI = (y * w + bX) * 4;
+
+                  src[i] = original[rI];
+                  src[i + 1] = original[i + 1];
+                  src[i + 2] = original[bI + 2];
+                }
+              }
+            }
+
+            ctx.putImageData(data, 0, 0);
+            glitch.style.transform = `translate(${(Math.random() - 0.5) * amount * 6}px, ${(Math.random() - 0.5) * amount * 2}px)`;
+          } catch (error) {
+            // Keep the normal inverse layer working if a browser blocks frame access.
+          }
+        });
+      }
+
+      function startPadVisualGlitchLoop(pad) {
+        if (!pad || pad.visualFrame) return;
+
+        const tick = (timestamp) => {
+          pad.visualFrame = requestAnimationFrame(tick);
+          if (timestamp - pad.visualLastFrameTime < 50) return;
+          pad.visualLastFrameTime = timestamp;
+          renderPadVisual(pad, timestamp);
+        };
+
+        pad.visualLastFrameTime = 0;
+        pad.visualFrame = requestAnimationFrame(tick);
+      }
+
+      function stopPadVisualGlitchLoop(pad) {
+        if (!pad) return;
+        if (pad.visualFrame) {
+          cancelAnimationFrame(pad.visualFrame);
+          pad.visualFrame = null;
+        }
+        pad.visualLastFrameTime = 0;
+
+        if (pad.invertedImages) {
+          pad.invertedImages.forEach((image) => {
+            const overlay = image.invertOverlays?.get(pad);
+            if (!overlay) return;
+            if (overlay._glitchElement) {
+              overlay._glitchElement.remove();
+              delete overlay._glitchElement;
+              delete overlay._glitchCanvas;
+            }
+            if (overlay._blurCanvas) {
+              overlay._blurCanvas.remove();
+              delete overlay._blurCanvas;
+            }
+          });
+        }
       }
 
       function applyPadImageInvert(pad) {
@@ -1915,6 +2501,8 @@
         images.forEach((image) => {
           createImageInvertOverlay(image, pad);
         });
+
+        setPadVisualEffect(pad, 0, 0, 0);
       }
 
       /*
@@ -1926,6 +2514,11 @@
         if (!pad) {
           return;
         }
+
+        stopPadVisualGlitchLoop(pad);
+        pad.visualBlur = 0;
+        pad.visualGlitch = 0;
+        pad.visualFlashHz = 0;
 
         if (pad.invertedImages) {
           pad.invertedImages.forEach((image) => {
@@ -1982,6 +2575,13 @@
           images.forEach((image) => {
             createImageInvertOverlay(image, pad);
           });
+
+          setPadVisualEffect(
+            pad,
+            pad.visualBlur || 0,
+            pad.visualGlitch || 0,
+            pad.visualFlashHz || 0,
+          );
         });
       }
 
@@ -2141,6 +2741,10 @@
 
         pad.holdGeneration++;
         pad.holdEffectZoneActive = false;
+        pad.visualBlur = 0;
+        pad.visualGlitch = 0;
+        pad.visualFlashHz = 0;
+        pad.visualLastFrameTime = 0;
 
         const generation = pad.holdGeneration;
 
@@ -2238,6 +2842,10 @@
         // 放開 PAD 不截斷正在播放的聲音。
         // 每一次觸發都讓音檔完整播放完畢。
         pad.holdEffectZoneActive = false;
+        pad.visualBlur = 0;
+        pad.visualGlitch = 0;
+        pad.visualFlashHz = 0;
+        stopPadVisualGlitchLoop(pad);
 
         /*
          * 放開 PAD：
@@ -2335,6 +2943,11 @@
 
             event.preventDefault();
 
+            if (pinchState && pinchState.target.element === element) {
+              action = null;
+              return;
+            }
+
             try {
               element.setPointerCapture(event.pointerId);
             } catch (error) {}
@@ -2417,6 +3030,11 @@
               return;
             }
 
+            if (pinchState && pinchState.target.element === element) {
+              event.preventDefault();
+              return;
+            }
+
             if (action === null) {
               return;
             }
@@ -2463,6 +3081,15 @@
         element.addEventListener(
           "pointerup",
           (event) => {
+            if (
+              sampler.mode === "edit" &&
+              performance.now() - pinchJustEndedAt < 250
+            ) {
+              action = null;
+              moved = true;
+              return;
+            }
+
             if (sampler.mode === "play") {
               event.preventDefault();
 
@@ -2599,15 +3226,18 @@
         updateCanvasBackground();
       }
 
-      backgroundColorButton.addEventListener("click", () => {
-        if (sampler.mode !== "edit") return;
-        backgroundColorInput.value = sampler.backgroundColor || "#ffffff";
-        backgroundColorInput.click();
-      });
-
       backgroundColorInput.addEventListener("input", (event) => {
         event.stopPropagation();
-        setBackgroundColor(event.target.value);
+        if (sampler.mode === "edit") {
+          setBackgroundColor(event.target.value);
+        }
+      });
+
+      backgroundColorInput.addEventListener("change", (event) => {
+        event.stopPropagation();
+        if (sampler.mode === "edit") {
+          setBackgroundColor(event.target.value);
+        }
       });
 
       backgroundImageButton.addEventListener("click", () => {
@@ -2800,6 +3430,11 @@
 
             event.preventDefault();
 
+            if (pinchState && pinchState.target.element === element) {
+              action = null;
+              return;
+            }
+
             try {
               element.setPointerCapture(event.pointerId);
             } catch (error) {}
@@ -2862,6 +3497,13 @@
         );
 
         element.addEventListener("pointerup", () => {
+          if (
+            sampler.mode === "edit" &&
+            performance.now() - pinchJustEndedAt < 250
+          ) {
+            action = null;
+            return;
+          }
           action = null;
         });
 
@@ -3348,6 +3990,42 @@
         pad.holdDistortionAmount = state.distortion;
         pad.holdFrequency = state.playbackRate;
 
+        /*
+         * VISUAL XY CONTROL — only the PAD intersection is affected.
+         * Left  = blur.
+         * Right = RGB glitch.
+         * Up/Down = inverse flash frequency.
+         */
+        const dx = currentX - pad.holdStartX;
+        const dy = currentY - pad.holdStartY;
+        const settings = getEffectControlSettings();
+        const horizontalDistance = Math.max(
+          0,
+          Math.abs(dx) - settings.neutralHalf,
+        );
+        const verticalDistance = Math.max(
+          0,
+          Math.abs(dy) - settings.neutralHalf,
+        );
+        const horizontalAmount = clamp01(horizontalDistance / settings.xRange);
+        const verticalAmount = clamp01(verticalDistance / settings.yRange);
+
+        const visualBlur =
+          dx < -settings.neutralHalf ? horizontalAmount * 32 : 0;
+        const visualGlitch = dx > settings.neutralHalf ? horizontalAmount : 0;
+
+        // 上 = 閃爍變快；下 = 閃爍變慢。
+        let visualFlashHz = 0;
+        if (dy < -settings.neutralHalf) {
+          const amount = clamp01(verticalDistance / settings.yRange);
+          visualFlashHz = amount * 10;
+        } else if (dy > settings.neutralHalf) {
+          const amount = clamp01(verticalDistance / settings.yRange);
+          // 往下仍然閃爍，但速度會變慢；最大約每 5 秒一次。
+          visualFlashHz = 0.2 + (1 - amount) * 0.8;
+        }
+
+        setPadVisualEffect(pad, visualBlur, visualGlitch, visualFlashHz);
         updatePadEffectUI(pad);
 
         const ctx = sampler.audioContext;
