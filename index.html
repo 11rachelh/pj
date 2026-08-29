@@ -144,7 +144,8 @@
         overflow: hidden;
         background: #fff;
       }
-      #canvasBackground img {
+      #canvasBackground img,
+      #canvasBackground video {
         display: block;
         width: 100%;
         height: 100%;
@@ -477,6 +478,9 @@
         height: 48px;
         padding: 0;
         font-size: 14px;
+        line-height: 1;
+        white-space: nowrap;
+        overflow: hidden;
         border: 2px solid #fff;
         background: transparent;
         color: #fff;
@@ -716,14 +720,18 @@
           BG COLOR
         </label>
         <button id="backgroundImageButton" class="backgroundButton">
-          BG IMAGE
+          BG MEDIA
         </button>
         <button id="clearBackgroundButton" class="backgroundButton">
           CLEAR BG
         </button>
 
         <input type="color" id="backgroundColorInput" value="#ffffff" />
-        <input type="file" id="backgroundImageInput" accept="image/*" />
+        <input
+          type="file"
+          id="backgroundImageInput"
+          accept="image/*,video/*,.heic,.heif,.mp4,.mov,.webm,.m4v"
+        />
 
         <input
           type="file"
@@ -749,7 +757,7 @@
         <input
           type="file"
           id="imageInput"
-          accept="image/*,video/*,.mp4,.webm,.mov,.m4v"
+          accept="image/*,.heic,.heif,video/*,.mp4,.webm,.mov,.m4v"
           multiple
         />
       </div>
@@ -824,6 +832,14 @@
       <div id="loopLayers" class="loopLayers"></div>
     </div>
 
+    <!-- =====================================================
+         HEIC / HEIF SUPPORT
+
+         heic2any converts HEIC/HEIF locally in the browser to a
+         browser-friendly JPEG. The original file is not uploaded.
+      ===================================================== -->
+    <script src="https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js"></script>
+
     <script>
       /* =====================================================
          SAMPLER STATE
@@ -852,6 +868,22 @@
 
         masterGain: null,
 
+        /* =====================================================
+           AUDIO RESOURCE CACHE
+
+           Reuse the same reverb impulse buffer instead of generating a
+           brand-new 2.8s stereo impulse for every Loop event.
+           This does not change the reverb sound; it only avoids needless
+           memory / CPU allocation during long sessions.
+        ===================================================== */
+        reverbImpulseBuffer: null,
+
+        /* =====================================================
+           SAFETY MIX 1 — MASTER COMPRESSOR + LIMITER
+           ===================================================== */
+        masterCompressor: null,
+        masterLimiter: null,
+
         masterVolume: 1,
 
         mediaStream: null,
@@ -877,6 +909,13 @@
         loopRecording: false,
 
         loopRecordingStartTime: null,
+
+        /*
+         * 所有 Loop 共用的「第一層 Loop 時間軸」起點。
+         * 第一層建立後就固定，不會因為第二／第三層按下 LOOP
+         * 的時間而重新開始計算。
+         */
+        loopMasterStartTime: null,
 
         loopRecordingPointerId: null,
 
@@ -1527,6 +1566,10 @@
           }
 
           sampler.audioContext = new AudioContextClass();
+          sampler.audioContext.addEventListener(
+            "statechange",
+            handleAudioContextStateChange,
+          );
         }
 
         if (!sampler.masterGain) {
@@ -1534,7 +1577,32 @@
 
           sampler.masterGain.gain.value = sampler.masterVolume;
 
-          sampler.masterGain.connect(sampler.audioContext.destination);
+          /* =====================================================
+             SAFETY MIX 1 — MASTER COMPRESSOR + LIMITER
+
+             所有 PAD / LOOP 都先進 masterGain，
+             再經過輕度 Compressor 與最後一道 Limiter。
+             只在整體峰值過高時介入，不改變原本 PAD / LOOP 的播放邏輯。
+          ===================================================== */
+          sampler.masterCompressor =
+            sampler.audioContext.createDynamicsCompressor();
+          sampler.masterCompressor.threshold.value = -18;
+          sampler.masterCompressor.knee.value = 12;
+          sampler.masterCompressor.ratio.value = 2.5;
+          sampler.masterCompressor.attack.value = 0.01;
+          sampler.masterCompressor.release.value = 0.15;
+
+          sampler.masterLimiter =
+            sampler.audioContext.createDynamicsCompressor();
+          sampler.masterLimiter.threshold.value = -1;
+          sampler.masterLimiter.knee.value = 0;
+          sampler.masterLimiter.ratio.value = 20;
+          sampler.masterLimiter.attack.value = 0.001;
+          sampler.masterLimiter.release.value = 0.08;
+
+          sampler.masterGain.connect(sampler.masterCompressor);
+          sampler.masterCompressor.connect(sampler.masterLimiter);
+          sampler.masterLimiter.connect(sampler.audioContext.destination);
         }
       }
 
@@ -1543,6 +1611,30 @@
 
         if (sampler.audioContext.state === "suspended") {
           await sampler.audioContext.resume();
+        }
+
+        // 某些瀏覽器在長時間 Web Audio 使用後可能暫時進入 interrupted。
+        // 使用者下一次互動時再次要求 resume，不改變原本播放內容。
+        if (sampler.audioContext.state === "interrupted") {
+          try {
+            await sampler.audioContext.resume();
+          } catch (error) {}
+        }
+      }
+
+      /*
+       * 只在瀏覽器把 AudioContext 暫停 / interrupted 時嘗試恢復。
+       * 不重建 AudioContext，避免既有 AudioBuffer 因跨 context 而失效。
+       */
+      function handleAudioContextStateChange() {
+        if (!sampler.audioContext) return;
+
+        if (
+          sampler.mode === "play" &&
+          (sampler.audioContext.state === "suspended" ||
+            sampler.audioContext.state === "interrupted")
+        ) {
+          sampler.audioContext.resume().catch(() => {});
         }
       }
 
@@ -1744,6 +1836,12 @@
           holdSource: null,
 
           holdGain: null,
+
+          /* =====================================================
+             SAFETY MIX 4 — PAD POLYPHONY / FADE
+             ===================================================== */
+          activeSources: [],
+          maxPolyphony: LOOP_POLYPHONY_LIMIT,
 
           holding: false,
 
@@ -2014,8 +2112,13 @@
         }
 
         if (pad.holdGain) {
+          const distortion =
+            pad.holdDistortionAmount ?? pad.holdDistortion ?? 0;
+          const compensatedVolume =
+            volume * getDistortionCompensation(distortion);
+
           pad.holdGain.gain.setTargetAtTime(
-            volume,
+            compensatedVolume,
             sampler.audioContext.currentTime,
             0.01,
           );
@@ -3178,22 +3281,126 @@
          BACKGROUND
       ===================================================== */
 
+      /* =====================================================
+         BACKGROUND MEDIA
+
+         支援：JPG / PNG / GIF / WEBP / HEIC / HEIF / MP4 / MOV /
+         WEBM / M4V。
+
+         圖片維持原本的背景行為；影片使用 <video> 自動播放、
+         靜音、inline、無限循環。影片不接受使用者操作，避免
+         影響 PLAY MODE 的 PAD 手勢。
+      ===================================================== */
+      function isBackgroundVideo(file) {
+        if (!file) return false;
+
+        return (
+          file.type.startsWith("video/") ||
+          /\.(mp4|mov|webm|m4v)$/i.test(file.name)
+        );
+      }
+
+      function stopAndRemoveBackgroundMedia() {
+        const oldMedia = sampler.backgroundImageElement;
+
+        if (oldMedia) {
+          if (oldMedia.tagName === "VIDEO") {
+            try {
+              oldMedia.pause();
+              oldMedia.removeAttribute("src");
+              oldMedia.load();
+            } catch (error) {}
+          }
+
+          try {
+            oldMedia.remove();
+          } catch (error) {}
+        }
+
+        sampler.backgroundImageElement = null;
+      }
+
       function updateCanvasBackground() {
         if (!canvasBackground) return;
+
         canvasBackground.style.backgroundColor =
           sampler.backgroundColor || "#ffffff";
 
-        if (sampler.backgroundImageURL) {
-          if (!sampler.backgroundImageElement) {
+        if (!sampler.backgroundImageURL) {
+          if (sampler.backgroundImageElement) {
+            sampler.backgroundImageElement.style.display = "none";
+          }
+          return;
+        }
+
+        const wantedTag =
+          sampler.backgroundMediaType === "video" ? "VIDEO" : "IMG";
+
+        /* 如果媒體種類改變，就重建元素；同種類則重複使用。 */
+        if (
+          !sampler.backgroundImageElement ||
+          sampler.backgroundImageElement.tagName !== wantedTag
+        ) {
+          stopAndRemoveBackgroundMedia();
+
+          if (sampler.backgroundMediaType === "video") {
+            const video = document.createElement("video");
+
+            video.autoplay = true;
+            video.loop = true;
+            video.muted = true;
+            video.defaultMuted = true;
+            video.playsInline = true;
+            video.preload = "auto";
+            video.controls = false;
+
+            video.setAttribute("autoplay", "");
+            video.setAttribute("loop", "");
+            video.setAttribute("muted", "");
+            video.setAttribute("playsinline", "");
+
+            video.addEventListener("loadeddata", () => {
+              video.play().catch(() => {});
+            });
+
+            video.addEventListener("canplay", () => {
+              if (video.paused) {
+                video.play().catch(() => {});
+              }
+            });
+
+            video.addEventListener("ended", () => {
+              /* loop 通常會自動處理；這裡再保險一次。 */
+              video.currentTime = 0;
+              video.play().catch(() => {});
+            });
+
+            sampler.backgroundImageElement = video;
+          } else {
             const img = document.createElement("img");
             img.draggable = false;
             sampler.backgroundImageElement = img;
-            canvasBackground.appendChild(img);
           }
-          sampler.backgroundImageElement.src = sampler.backgroundImageURL;
+
+          sampler.backgroundImageElement.style.width = "100%";
+          sampler.backgroundImageElement.style.height = "100%";
+          sampler.backgroundImageElement.style.objectFit = "fill";
+          sampler.backgroundImageElement.style.pointerEvents = "none";
           sampler.backgroundImageElement.style.display = "block";
-        } else if (sampler.backgroundImageElement) {
-          sampler.backgroundImageElement.style.display = "none";
+
+          canvasBackground.appendChild(sampler.backgroundImageElement);
+        }
+
+        const media = sampler.backgroundImageElement;
+        media.src = sampler.backgroundImageURL;
+        media.style.display = "block";
+
+        if (sampler.backgroundMediaType === "video") {
+          media.muted = true;
+          media.defaultMuted = true;
+          media.loop = true;
+          media.playsInline = true;
+          media.play().catch(() => {});
         }
       }
 
@@ -3205,12 +3412,18 @@
 
       function setBackgroundImage(file) {
         if (!file) return;
+
         if (sampler.backgroundImageURL) {
           try {
             URL.revokeObjectURL(sampler.backgroundImageURL);
           } catch (error) {}
         }
+
         sampler.backgroundImageURL = URL.createObjectURL(file);
+        sampler.backgroundMediaType = isBackgroundVideo(file)
+          ? "video"
+          : "image";
+
         updateCanvasBackground();
       }
 
@@ -3220,7 +3433,11 @@
             URL.revokeObjectURL(sampler.backgroundImageURL);
           } catch (error) {}
         }
+
+        stopAndRemoveBackgroundMedia();
+
         sampler.backgroundImageURL = null;
+        sampler.backgroundMediaType = null;
         sampler.backgroundColor = "#ffffff";
         backgroundColorInput.value = "#ffffff";
         updateCanvasBackground();
@@ -3261,6 +3478,25 @@
       updateCanvasBackground();
 
       /* =====================================================
+         BACKGROUND VIDEO PLAYBACK RECOVERY
+
+         部分瀏覽器在切回分頁／重新取得畫面後可能暫停影片；
+         若目前背景是影片，就嘗試恢復播放。
+      ===================================================== */
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") return;
+
+        const video = sampler.backgroundImageElement;
+        if (
+          sampler.backgroundMediaType === "video" &&
+          video &&
+          video.tagName === "VIDEO"
+        ) {
+          video.play().catch(() => {});
+        }
+      });
+
+      /* =====================================================
          IMAGE
       ===================================================== */
 
@@ -3274,15 +3510,76 @@
         imageInput.click();
       });
 
-      imageInput.addEventListener("change", (event) => {
+      imageInput.addEventListener("change", async (event) => {
         const files = Array.from(event.target.files || []);
 
-        files.forEach((file) => {
-          createImage(file);
-        });
+        /* =====================================================
+           HEIC / HEIF IMAGE IMPORT
+
+           Normal images continue through the original path unchanged.
+           HEIC / HEIF files are converted locally to JPEG first, because
+           the browser's <img> element cannot reliably decode HEIC/HEIF.
+
+           The conversion happens entirely in the browser; the image is
+           not uploaded to a server.
+        ===================================================== */
+        for (const file of files) {
+          try {
+            const processedFile = await prepareImageFile(file);
+            createImage(processedFile);
+          } catch (error) {
+            console.error("Failed to import image:", file.name, error);
+            alert(
+              `無法載入圖片：${file.name}\n\nHEIC / HEIF 轉換失敗，請確認網路連線後再試一次。`,
+            );
+          }
+        }
 
         imageInput.value = "";
       });
+
+      /* =====================================================
+         HEIC / HEIF → JPEG
+
+         只處理 HEIC / HEIF；JPG、PNG、GIF、WEBP、影片等原本的
+         檔案完全不經過轉換，因此不改變既有圖片／影片流程。
+      ===================================================== */
+      async function prepareImageFile(file) {
+        if (!file) {
+          throw new Error("No image file provided.");
+        }
+
+        const isHEIC = await HeicTo.isHeic(file);
+
+        if (!isHEIC) {
+          return file;
+        }
+
+        if (
+          typeof HeicTo !== "function" ||
+          typeof HeicTo.isHeic !== "function"
+        ) {
+          throw new Error("HEIC converter library is unavailable.");
+        }
+
+        const converted = await HeicTo({
+          blob: file,
+          type: "image/jpeg",
+          quality: 0.92,
+        });
+
+        /* HEIC bursts can return an array. For + IMAGE, keep the first
+           converted frame so it behaves like one normal image layer. */
+        const blob = Array.isArray(converted) ? converted[0] : converted;
+
+        if (!(blob instanceof Blob)) {
+          throw new Error("HEIC conversion did not return an image blob.");
+        }
+
+        return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), {
+          type: "image/jpeg",
+        });
+      }
 
       function createImage(file) {
         if (!file) return;
@@ -3891,6 +4188,29 @@
       const MIN_PLAYBACK_RATE = 0.72;
       const MAX_PLAYBACK_RATE = 1.38;
 
+      /* =====================================================
+         LOOP / AUDIO STABILITY
+
+         最多保留五層 Loop。
+         這不是改變時間軸；只是避免無限制建立 scheduler / source。
+      ===================================================== */
+      const MAX_LOOP_LAYERS = 5;
+      const LOOP_POLYPHONY_LIMIT = 6;
+      const LOOP_SOURCE_POLYPHONY_LIMIT = 16;
+
+      function getReverbImpulseBuffer() {
+        const ctx = sampler.audioContext;
+        if (!ctx) {
+          return null;
+        }
+
+        if (!sampler.reverbImpulseBuffer) {
+          sampler.reverbImpulseBuffer = makeReverbImpulse();
+        }
+
+        return sampler.reverbImpulseBuffer;
+      }
+
       function makeReverbImpulse(duration = 2.8, decay = 2.2) {
         const ctx = sampler.audioContext;
         const length = Math.max(1, Math.floor(ctx.sampleRate * duration));
@@ -4066,6 +4386,16 @@
           pad.holdDistortion.curve = makeDistortionCurve(state.distortion);
         }
 
+        /* SAFETY MIX 2 — keep PAD loudness more stable as distortion rises. */
+        if (pad.holdGain) {
+          pad.holdGain.gain.cancelScheduledValues(now);
+          pad.holdGain.gain.setTargetAtTime(
+            pad.volume * getDistortionCompensation(state.distortion),
+            now,
+            smoothing,
+          );
+        }
+
         if (pad.holdSource) {
           try {
             pad.holdSource.playbackRate.cancelScheduledValues(now);
@@ -4097,6 +4427,131 @@
         }
       }
 
+      /* =====================================================
+         SAFETY MIX 2 — DISTORTION VOLUME COMPENSATION
+
+         Distortion 會增加諧波與主觀音量。
+         distortion 越高，這裡就稍微降低該 PAD 的輸出增益，
+         讓效果變髒／變密時，不會同時突然變得過大聲。
+      ===================================================== */
+      function getDistortionCompensation(amount) {
+        const distortion = clamp01(amount);
+        return 1 - distortion * 0.35;
+      }
+
+      /* =====================================================
+         SAFETY MIX 4 — PAD POLYPHONY / FADE
+
+         保留原本的自然疊音。
+         只有同一個 PAD 同時存在超過 6 個 source 時，
+         才把最舊的一個用 15ms fade-out 移除，避免快速 hold / loop
+         產生過多重疊聲音。
+      ===================================================== */
+      function registerPadSource(pad, source, chain, polyphonyLimit = null) {
+        if (!pad || !source || !chain) return;
+
+        if (!Array.isArray(pad.activeSources)) {
+          pad.activeSources = [];
+        }
+
+        const entry = { source, chain };
+        pad.activeSources.push(entry);
+
+        const requestedLimit =
+          polyphonyLimit !== null
+            ? Number(polyphonyLimit)
+            : Number(pad.maxPolyphony);
+
+        const maxPolyphony = Math.max(
+          1,
+          Number.isFinite(requestedLimit) && requestedLimit > 0
+            ? requestedLimit
+            : LOOP_POLYPHONY_LIMIT,
+        );
+
+        while (pad.activeSources.length > maxPolyphony) {
+          const oldest = pad.activeSources.shift();
+          if (!oldest) break;
+
+          const oldSource = oldest.source;
+          const oldGain = oldest.chain?.padGain;
+          const ctx = sampler.audioContext;
+
+          try {
+            if (oldGain && ctx) {
+              const now = ctx.currentTime;
+              oldGain.gain.cancelScheduledValues(now);
+              oldGain.gain.setValueAtTime(
+                Math.max(0.0001, oldGain.gain.value),
+                now,
+              );
+              oldGain.gain.linearRampToValueAtTime(0, now + 0.015);
+            }
+          } catch (error) {}
+
+          setTimeout(() => {
+            try {
+              oldSource.stop();
+            } catch (error) {}
+          }, 20);
+        }
+      }
+
+      function unregisterPadSource(pad, source) {
+        if (!pad || !Array.isArray(pad.activeSources)) return;
+
+        const index = pad.activeSources.findIndex(
+          (item) => item.source === source,
+        );
+
+        if (index !== -1) {
+          pad.activeSources.splice(index, 1);
+        }
+      }
+
+      /*
+       * Loop source 的統一清理。
+       *
+       * 重要：停止 Loop 時不能只從 sampler.loopSources 移除，
+       * 還要同步從 PAD 的 activeSources 移除，否則下一次手動點 PAD
+       * 會把已經不存在的舊 source 當成仍在播放。
+       */
+      function cleanupLoopSource(loop, source, chain = null, pad = null) {
+        if (!source) return;
+
+        const actualPad = pad || source.__samplerPad || null;
+        const actualChain = chain || source.__samplerChain || null;
+
+        unregisterPadSource(actualPad, source);
+
+        const globalIndex = sampler.loopSources.indexOf(source);
+        if (globalIndex !== -1) {
+          sampler.loopSources.splice(globalIndex, 1);
+        }
+
+        if (loop?.scheduledSources) {
+          const loopIndex = loop.scheduledSources.indexOf(source);
+          if (loopIndex !== -1) {
+            loop.scheduledSources.splice(loopIndex, 1);
+          }
+        }
+
+        try {
+          source.disconnect();
+        } catch (error) {}
+
+        disconnectPadAudioChain(actualChain);
+
+        try {
+          delete source.__samplerPad;
+          delete source.__samplerChain;
+        } catch (error) {}
+      }
+
+      /* =====================================================
+         PLAY MODE — AUDIO CHAIN
+      ===================================================== */
+
       function connectPadAudioChain(source, pad, destination, options = {}) {
         const ctx = sampler.audioContext;
 
@@ -4110,7 +4565,10 @@
           options.distortion !== undefined ? clamp01(options.distortion) : 0;
 
         const padGain = ctx.createGain();
-        padGain.gain.value = pad.volume;
+
+        /* SAFETY MIX 2 — DISTORTION VOLUME COMPENSATION */
+        const distortionCompensation = getDistortionCompensation(distortion);
+        padGain.gain.value = pad.volume * distortionCompensation;
 
         const filter = ctx.createBiquadFilter();
         filter.type = "lowpass";
@@ -4127,7 +4585,18 @@
         wetGain.gain.value = reverb * 1.05;
 
         const convolver = ctx.createConvolver();
-        convolver.buffer = makeReverbImpulse();
+        convolver.buffer = getReverbImpulseBuffer();
+
+        /* =====================================================
+           SAFETY MIX 3 — REVERB HIGH CUT
+
+           只處理 Reverb 的 wet 路徑；dry 聲音不會被這個 high cut 影響。
+           讓 distortion 產生的高頻諧波不會在多層 reverb 疊加後變得刺耳。
+        ===================================================== */
+        const reverbHighCut = ctx.createBiquadFilter();
+        reverbHighCut.type = "lowpass";
+        reverbHighCut.frequency.value = 7000;
+        reverbHighCut.Q.value = 0.2;
 
         source.playbackRate.value = playbackRate;
 
@@ -4138,7 +4607,8 @@
         dryGain.connect(padGain);
 
         distortionNode.connect(convolver);
-        convolver.connect(wetGain);
+        convolver.connect(reverbHighCut);
+        reverbHighCut.connect(wetGain);
         wetGain.connect(padGain);
 
         padGain.connect(destination);
@@ -4150,6 +4620,7 @@
           dryGain,
           wetGain,
           convolver,
+          reverbHighCut,
         };
       }
 
@@ -4173,8 +4644,11 @@
 
         initAudio();
 
-        if (sampler.audioContext.state === "suspended") {
-          sampler.audioContext.resume();
+        if (
+          sampler.audioContext.state === "suspended" ||
+          sampler.audioContext.state === "interrupted"
+        ) {
+          sampler.audioContext.resume().catch(() => {});
         }
 
         const source = sampler.audioContext.createBufferSource();
@@ -4202,6 +4676,9 @@
           options.startTime !== undefined
             ? options.startTime
             : sampler.audioContext.currentTime;
+
+        /* SAFETY MIX 4 — register every PAD source before it starts. */
+        registerPadSource(pad, source, chain);
 
         source.start(startTime);
 
@@ -4236,6 +4713,8 @@
             pad.holdDistortion = null;
           }
 
+          unregisterPadSource(pad, source);
+
           try {
             source.disconnect();
           } catch (error) {}
@@ -4248,14 +4727,15 @@
 
       /* =====================================================
          LOOP EVENT RECORDING
+
+         第一層：按下 LOOP 開始記錄，放開 LOOP 決定第一個 Loop 的長度。
+         第二層以後：Loop 按鈕只是一個「開始收集事件」的開關；
+         事件的位置永遠取自「目前正在播放的第一層時間軸」，
+         絕不使用這次 LOOP 按鈕按了多久來決定位置或長度。
       ===================================================== */
 
       async function startLoopRecording() {
-        if (sampler.loopRecording) {
-          return;
-        }
-
-        if (sampler.mode !== "play") {
+        if (sampler.loopRecording || sampler.mode !== "play") {
           return;
         }
 
@@ -4263,45 +4743,78 @@
           await resumeAudio();
         } catch (error) {
           console.error(error);
-
-          return;
-        }
-
-        sampler.loopRecording = true;
-
-        sampler.cancelLoopRecording = false;
-
-        sampler.loopEvents = [];
-
-        sampler.loopRecordingStartTime = sampler.audioContext.currentTime;
-
-        loopButton.classList.add("recording");
-
-        loopButton.textContent = "RECORDING";
-
-        canvas.classList.add("loopRecording");
-      }
-
-      /* =====================================================
-         RECORD PAD EVENT
-      ===================================================== */
-
-      function recordPadEvent(pad) {
-        if (!sampler.loopRecording) {
-          return;
-        }
-
-        if (sampler.loopRecordingStartTime === null) {
           return;
         }
 
         const now = sampler.audioContext.currentTime;
 
-        const time = now - sampler.loopRecordingStartTime;
+        sampler.loopRecording = true;
+        sampler.cancelLoopRecording = false;
+        sampler.loopEvents = [];
+
+        // 只用來知道這次錄製 session 何時開始。
+        // 它不會被拿來當第二層以後的 Loop 時間軸。
+        sampler.loopRecordingStartTime = now;
+
+        loopButton.classList.add("recording");
+        loopButton.textContent = "REC";
+        canvas.classList.add("loopRecording");
+      }
+
+      /* =====================================================
+         RECORD PAD EVENT
+
+         關鍵：
+         - 第一層尚未有 Loop 時長：用第一層錄音開始時間記事件。
+         - 第一層已經建立並正在播放：直接用「實際播放時間軸」
+           計算現在位於 0 ~ loopDuration 的哪個位置。
+
+         所以如果第一層是 5 秒：
+             0 ---- 1 ---- 2 ---- 3 ---- 4 ---- 5
+                                      ↑
+                                  此刻按 PAD
+
+         第二層不管 LOOP 按鈕按了 0.2 秒、1 秒或 10 秒，
+         這個 PAD 都只會被固定在第 3 秒。
+      ===================================================== */
+
+      function recordPadEvent(pad) {
+        if (!sampler.loopRecording || !pad || !sampler.audioContext) {
+          return;
+        }
+
+        const now = sampler.audioContext.currentTime;
+
+        let time;
+
+        if (
+          sampler.loopDuration !== null &&
+          sampler.loopDuration > 0 &&
+          sampler.loopMasterStartTime !== null
+        ) {
+          // 已經有播放中的 master Loop：以「播放起點」為唯一時間軸。
+          const elapsed = now - sampler.loopMasterStartTime;
+          const duration = sampler.loopDuration;
+
+          time = ((elapsed % duration) + duration) % duration;
+
+          // 只處理極小的 AudioContext 浮點誤差。
+          const epsilon = 0.0005;
+          if (time < epsilon || duration - time < epsilon) {
+            time = 0;
+          }
+        } else {
+          // 第一層：它本身負責建立 Loop 長度。
+          const recordingStart = sampler.loopRecordingStartTime;
+          if (recordingStart === null) {
+            return;
+          }
+          time = Math.max(0, now - recordingStart);
+        }
 
         sampler.loopEvents.push({
           pad: pad,
-          time: Math.max(0, time),
+          time: time,
           playbackRate: pad.holdFrequency ?? 1,
           reverb: pad.holdReverb ?? 0,
           distortion: pad.holdDistortion ?? pad.holdDistortionAmount ?? 0,
@@ -4318,20 +4831,14 @@
         }
 
         sampler.loopRecording = false;
-
         loopButton.classList.remove("recording");
-
         loopButton.textContent = "LOOP";
-
         canvas.classList.remove("loopRecording");
 
         if (sampler.cancelLoopRecording) {
           sampler.cancelLoopRecording = false;
-
           sampler.loopEvents = [];
-
           sampler.loopRecordingStartTime = null;
-
           return;
         }
 
@@ -4340,6 +4847,9 @@
 
       /* =====================================================
          FINISH LOOP
+
+         只有第一層的「按下 → 放開」時間差會決定 Loop 長度。
+         第二層以後完全忽略自己的錄製時長；它們只有事件位置。
       ===================================================== */
 
       function finishLoopRecording() {
@@ -4352,71 +4862,79 @@
         }));
 
         const recordingStart = sampler.loopRecordingStartTime;
-
         const recordingEndTime = sampler.audioContext.currentTime;
 
         sampler.loopEvents = [];
-
         sampler.loopRecordingStartTime = null;
 
         if (recordingStart === null) {
           return;
         }
 
-        let duration = recordingEndTime - recordingStart;
-
-        duration = Math.max(0.05, duration);
-
+        // 只有第一層決定 duration。
         if (sampler.loopDuration === null) {
-          sampler.loopDuration = duration;
-
+          sampler.loopDuration = Math.max(
+            0.05,
+            recordingEndTime - recordingStart,
+          );
           updateLoopDurationUI();
         }
 
-        duration = sampler.loopDuration;
+        const duration = sampler.loopDuration;
 
         if (!events.length) {
           console.warn("Loop contains no Pad events.");
-
           return;
         }
 
-        const validEvents = events.filter(
-          (event) => event.time >= 0 && event.time < duration,
-        );
+        if (sampler.loops.length >= MAX_LOOP_LAYERS) {
+          console.warn(`Maximum ${MAX_LOOP_LAYERS} Loop layers reached.`);
+          sampler.loopEvents = [];
+          renderLoopLayers();
+          return;
+        }
 
-        if (!validEvents.length) {
+        // 第一層的 event 是以 recordingStart 計算；
+        // 第二層以後的 event 已經是 master playback timeline 的位置。
+        const normalizedEvents = events
+          .map((event) => {
+            let time = event.time;
+
+            if (duration > 0) {
+              time = ((time % duration) + duration) % duration;
+
+              const epsilon = 0.0005;
+              if (time < epsilon || duration - time < epsilon) {
+                time = 0;
+              }
+            } else {
+              time = 0;
+            }
+
+            return { ...event, time };
+          })
+          .filter((event) => event.time >= 0 && event.time < duration);
+
+        if (!normalizedEvents.length) {
           console.warn("Loop contains no valid Pad events.");
-
           return;
         }
 
         const loop = {
           id: sampler.nextLoopId++,
-
           duration: duration,
-
-          events: validEvents,
-
+          events: normalizedEvents,
           muted: false,
-
           scheduledSources: [],
-
           gain: null,
-
           schedulerTimer: null,
-
           schedulerGeneration: 0,
-
           schedulerActive: false,
-
           startTime: null,
         };
 
         sampler.loops.push(loop);
-
         renderLoopLayers();
-
         startLoopScheduler(loop);
       }
 
@@ -4430,34 +4948,29 @@
         }
 
         loop.schedulerGeneration++;
-
         loop.schedulerActive = false;
 
         if (loop.schedulerTimer !== null) {
           clearTimeout(loop.schedulerTimer);
-
           loop.schedulerTimer = null;
         }
 
         if (loop.scheduledSources && loop.scheduledSources.length) {
-          loop.scheduledSources.forEach((source) => {
+          const sources = loop.scheduledSources.slice();
+
+          sources.forEach((source) => {
             try {
               source.onended = null;
             } catch (error) {}
+
+            const pad = source.__samplerPad || null;
+            const chain = source.__samplerChain || null;
 
             try {
               source.stop();
             } catch (error) {}
 
-            try {
-              source.disconnect();
-            } catch (error) {}
-
-            const index = sampler.loopSources.indexOf(source);
-
-            if (index !== -1) {
-              sampler.loopSources.splice(index, 1);
-            }
+            cleanupLoopSource(loop, source, chain, pad);
           });
         }
 
@@ -4470,7 +4983,6 @@
         }
 
         loop.gain = null;
-
         loop.startTime = null;
       }
 
@@ -4483,18 +4995,22 @@
           stopLoopScheduler(loop);
         });
 
-        sampler.loopSources.forEach((source) => {
+        // 防止 scheduler 之外殘留的 source 留在全域陣列。
+        const leftovers = sampler.loopSources.slice();
+
+        leftovers.forEach((source) => {
           try {
             source.onended = null;
           } catch (error) {}
+
+          const pad = source.__samplerPad || null;
+          const chain = source.__samplerChain || null;
 
           try {
             source.stop();
           } catch (error) {}
 
-          try {
-            source.disconnect();
-          } catch (error) {}
+          cleanupLoopSource(null, source, chain, pad);
         });
 
         sampler.loopSources = [];
@@ -4505,48 +5021,77 @@
       ===================================================== */
 
       function startLoopScheduler(loop) {
-        if (!loop) {
-          return;
-        }
-
-        if (!sampler.loops.includes(loop)) {
-          return;
-        }
-
-        if (!loop.events.length) {
+        if (!loop || !sampler.loops.includes(loop) || !loop.events.length) {
           return;
         }
 
         initAudio();
 
-        if (sampler.audioContext.state === "suspended") {
-          sampler.audioContext.resume();
+        if (
+          sampler.audioContext.state === "suspended" ||
+          sampler.audioContext.state === "interrupted"
+        ) {
+          sampler.audioContext.resume().catch(() => {});
         }
 
         if (loop.schedulerActive) {
           return;
         }
 
+        if (!sampler.loopDuration || sampler.loopDuration <= 0) {
+          return;
+        }
+
         loop.schedulerGeneration++;
-
         const generation = loop.schedulerGeneration;
-
         loop.schedulerActive = true;
 
         const gain = sampler.audioContext.createGain();
-
         gain.gain.setValueAtTime(
           loop.muted ? 0 : 1,
           sampler.audioContext.currentTime,
         );
-
         gain.connect(sampler.masterGain);
-
         loop.gain = gain;
 
-        loop.startTime = sampler.audioContext.currentTime + 0.05;
+        const now = sampler.audioContext.currentTime;
+        const duration = sampler.loopDuration;
 
-        scheduleLoopCycle(loop, loop.startTime, generation);
+        /*
+         * 第一層第一次開始播放時，才建立「真正的播放時間軸」。
+         * 這點很重要：之後所有 Layer 的事件位置都是相對於
+         * 這個實際開始播放的時間，而不是相對於各自按 LOOP 的時間。
+         */
+        if (sampler.loopMasterStartTime === null) {
+          const firstStart = now + 0.05;
+          sampler.loopMasterStartTime = firstStart;
+
+          loop.startTime = firstStart;
+          scheduleLoopCycle(loop, firstStart, generation);
+          return;
+        }
+
+        /*
+         * 已經存在播放中的 master clock。
+         * 找到 master timeline 上「下一個共同循環邊界」。
+         * 不重新設定 master clock，因此新 Layer 不會漂移。
+         */
+        const masterStart = sampler.loopMasterStartTime;
+        const safety = 0.05;
+        const targetTime = now + safety;
+
+        let cycleIndex = Math.ceil((targetTime - masterStart) / duration);
+        if (!Number.isFinite(cycleIndex)) {
+          cycleIndex = 0;
+        }
+        if (cycleIndex < 0) {
+          cycleIndex = 0;
+        }
+
+        const cycleStartTime = masterStart + cycleIndex * duration;
+
+        loop.startTime = cycleStartTime;
+        scheduleLoopCycle(loop, cycleStartTime, generation);
       }
 
       /* =====================================================
@@ -4607,33 +5152,29 @@
             return;
           }
 
+          /*
+           * Loop source 也必須進入 PAD polyphony 管理。
+           * 這是穩定性的關鍵：五層 Loop 長時間循環時，
+           * 同一個 PAD 不會無限制累積重疊 source。
+           */
+          source.__samplerPad = event.pad;
+          source.__samplerChain = chain;
+
+          registerPadSource(
+            event.pad,
+            source,
+            chain,
+            LOOP_SOURCE_POLYPHONY_LIMIT,
+          );
+
+          source.onended = () => {
+            cleanupLoopSource(loop, source, chain, event.pad);
+          };
+
           source.start(startTime);
 
           sampler.loopSources.push(source);
-
           loop.scheduledSources.push(source);
-
-          source.onended = () => {
-            const globalIndex = sampler.loopSources.indexOf(source);
-
-            if (globalIndex !== -1) {
-              sampler.loopSources.splice(globalIndex, 1);
-            }
-
-            const loopIndex = loop.scheduledSources.indexOf(source);
-
-            if (loopIndex !== -1) {
-              loop.scheduledSources.splice(loopIndex, 1);
-            }
-
-            try {
-              source.disconnect();
-            } catch (error) {}
-
-            try {
-              disconnectPadAudioChain(chain);
-            } catch (error) {}
-          };
         });
 
         const nextCycle = cycleStartTime + loop.duration;
@@ -4780,6 +5321,8 @@
         sampler.nextLoopId = 1;
 
         sampler.loopDuration = null;
+
+        sampler.loopMasterStartTime = null;
 
         sampler.loopRecording = false;
 
