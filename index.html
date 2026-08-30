@@ -389,7 +389,10 @@
         inset: 0;
         z-index: 5000;
         pointer-events: none;
-        overflow: hidden;
+        overflow: visible;
+        /* The whole pointer layer is composited as a difference layer over the canvas. */
+        mix-blend-mode: difference;
+        isolation: auto;
       }
       .playPointer {
         position: fixed;
@@ -404,7 +407,8 @@
         transform-origin: top left;
         transition: opacity 90ms ease-out;
         z-index: 2;
-        mix-blend-mode: difference;
+        mix-blend-mode: normal;
+        isolation: auto;
       }
       .playPointer.visible {
         opacity: 1;
@@ -419,6 +423,10 @@
         height: 100%;
         object-fit: contain;
         filter: invert(1);
+        -webkit-filter: invert(1);
+        /* Keep the GIF white after inversion; the parent layer performs the blend. */
+        mix-blend-mode: normal;
+        isolation: auto;
         pointer-events: none;
       }
       body:not(.playMode) #pointerOverlayLayer {
@@ -642,6 +650,22 @@
         width: 100vw !important;
         height: 100vh !important;
         overflow: hidden !important;
+      }
+
+      html.appFullscreen,
+      body.appFullscreen {
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        -webkit-overflow-scrolling: auto !important;
+        touch-action: none !important;
+      }
+
+      body.appFullscreen #canvas,
+      body.appFullscreen #pointerOverlayLayer {
+        touch-action: none !important;
       }
       @media (max-width: 800px) {
         .toolbar {
@@ -1862,6 +1886,7 @@
            * 建立 inverse overlay。
            */
           invertedImages: new Set(),
+          inverseActive: false,
 
           holdTimer: null,
 
@@ -1933,6 +1958,16 @@
 
         try {
           pad = createPad(10 + Math.random() * 50, 10 + Math.random() * 50);
+
+          // IMPORT PAD 自動使用檔案名稱，去掉最後一個副檔名（例如 .mp4）。
+          const importedPadName = file.name.replace(/\.[^/.]+$/, "").trim();
+          if (importedPadName) {
+            pad.name = importedPadName;
+            const nameElement = pad.element?.querySelector(".padName");
+            if (nameElement) {
+              nameElement.textContent = pad.name;
+            }
+          }
 
           updatePadStatus(pad, "LOADING");
 
@@ -2146,7 +2181,7 @@
          * 如果 PLAY MODE 有 PAD 正在作用，
          * 尺寸改變後重新計算 inverse。
          */
-        if (sampler.mode === "play" && pad.holding) {
+        if (pad.holding || pad.inverseActive) {
           refreshAllPadImageInverts();
         }
       }
@@ -2585,7 +2620,7 @@
       }
 
       function applyPadImageInvert(pad) {
-        if (!pad || sampler.mode !== "play") {
+        if (!pad || (sampler.mode !== "play" && sampler.mode !== "edit")) {
           return;
         }
 
@@ -2600,6 +2635,7 @@
          * 記住這個 PAD 目前作用在哪些圖片。
          */
         pad.invertedImages = new Set(images);
+        pad.inverseActive = true;
 
         images.forEach((image) => {
           createImageInvertOverlay(image, pad);
@@ -2618,6 +2654,7 @@
           return;
         }
 
+        pad.inverseActive = false;
         stopPadVisualGlitchLoop(pad);
         pad.visualBlur = 0;
         pad.visualGlitch = 0;
@@ -2648,12 +2685,12 @@
        * 重新計算 inverse 範圍。
        */
       function refreshAllPadImageInverts() {
-        if (sampler.mode !== "play") {
+        if (sampler.mode !== "play" && sampler.mode !== "edit") {
           return;
         }
 
         sampler.pads.forEach((pad) => {
-          if (!pad.holding) {
+          if (!pad.holding && !pad.inverseActive) {
             return;
           }
 
@@ -3046,6 +3083,9 @@
 
             event.preventDefault();
 
+            // EDIT MODE 也沿用 PLAY MODE 的 PAD 區域 inverse。
+            applyPadImageInvert(pad);
+
             if (pinchState && pinchState.target.element === element) {
               action = null;
               return;
@@ -3084,6 +3124,15 @@
             if (sampler.recordingPad === pad) {
               selectPad(pad);
 
+              return;
+            }
+
+            /* 已經有聲音的 PAD 不再接受雙擊錄音，只保留單點預覽。 */
+            if (pad.audioBuffer) {
+              pad.lastTapTime = 0;
+              pad.pendingDoubleTap = false;
+              selectPad(pad);
+              playPad(pad);
               return;
             }
 
@@ -3210,6 +3259,8 @@
             }
 
             if (moved) {
+              /* EDIT MODE：放開後立刻取消這次 pointer 的 inverse。 */
+              clearPadImageInvert(pad);
               action = null;
 
               return;
@@ -3217,6 +3268,7 @@
 
             if (sampler.recordingPad === pad && !pad.pendingDoubleTap) {
               stopRecording();
+              clearPadImageInvert(pad);
 
               action = null;
 
@@ -3225,6 +3277,7 @@
 
             if (pad.pendingDoubleTap) {
               pad.pendingDoubleTap = false;
+              clearPadImageInvert(pad);
 
               action = null;
 
@@ -3235,12 +3288,14 @@
 
             if (duration >= CLICK_TIME) {
               pad.lastTapTime = 0;
+              clearPadImageInvert(pad);
 
               action = null;
 
               return;
             }
 
+            clearPadImageInvert(pad);
             action = null;
           },
           { passive: false },
@@ -3257,6 +3312,7 @@
               return;
             }
 
+            clearPadImageInvert(pad);
             action = null;
 
             pad.pendingDoubleTap = false;
@@ -3691,7 +3747,7 @@
          * 尺寸變化後重新計算。
          */
         if (
-          sampler.mode === "play" &&
+          (sampler.mode === "play" || sampler.mode === "edit") &&
           image.invertOverlays &&
           image.invertOverlays.size > 0
         ) {
@@ -5111,7 +5167,7 @@
           return;
         }
 
-        if (sampler.mode !== "play") {
+        if (sampler.mode !== "play" && sampler.mode !== "edit") {
           return;
         }
 
@@ -5199,7 +5255,7 @@
             return;
           }
 
-          if (sampler.mode !== "play") {
+          if (sampler.mode !== "play" && sampler.mode !== "edit") {
             return;
           }
 
@@ -5552,7 +5608,7 @@
           stopLoopRecording();
         }
 
-        stopAllLoopSources();
+        /* 已經錄好的 Loop 在 EDIT MODE 也持續沿用同一條 master clock 播放。 */
 
         sampler.mode = "edit";
 
@@ -5704,8 +5760,53 @@
         }
       }
 
+      /* iPad Safari：全螢幕時鎖住頁面 gesture，避免長按拖曳被當成縮放/導覽。 */
+      document.addEventListener(
+        "pointerdown",
+        (event) => {
+          if (!getFullscreenElement()) return;
+          if (event.target.closest?.("#fullscreenButton")) return;
+          if (sampler.mode === "play" || sampler.mode === "edit")
+            event.preventDefault();
+        },
+        { passive: false, capture: true },
+      );
+      document.addEventListener(
+        "pointermove",
+        (event) => {
+          if (!getFullscreenElement()) return;
+          if (event.target.closest?.("#fullscreenButton")) return;
+          if (sampler.mode === "play" || sampler.mode === "edit")
+            event.preventDefault();
+        },
+        { passive: false, capture: true },
+      );
+      document.addEventListener(
+        "touchstart",
+        (event) => {
+          if (getFullscreenElement()) event.preventDefault();
+        },
+        { passive: false, capture: true },
+      );
+      document.addEventListener(
+        "touchmove",
+        (event) => {
+          if (getFullscreenElement()) event.preventDefault();
+        },
+        { passive: false, capture: true },
+      );
+      document.addEventListener(
+        "touchend",
+        (event) => {
+          if (getFullscreenElement()) event.preventDefault();
+        },
+        { passive: false, capture: true },
+      );
+
       function updateFullscreenButton() {
         const active = !!getFullscreenElement();
+        document.documentElement.classList.toggle("appFullscreen", active);
+        document.body.classList.toggle("appFullscreen", active);
         fullscreenButton.classList.toggle("isFullscreen", active);
         fullscreenButton.textContent = active ? "" : "FULL";
         fullscreenButton.setAttribute(
@@ -5753,7 +5854,7 @@
 
         if (
           !document.hidden &&
-          sampler.mode === "play" &&
+          (sampler.mode === "play" || sampler.mode === "edit") &&
           sampler.loops.length > 0
         ) {
           resumeAudio().then(() => {
