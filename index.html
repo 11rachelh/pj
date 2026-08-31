@@ -1980,7 +1980,7 @@
           const decodedBuffer =
             await sampler.audioContext.decodeAudioData(arrayBuffer);
 
-          pad.audioBuffer = trimAudioBuffer(decodedBuffer);
+          pad.audioBuffer = decodedBuffer;
 
           updatePadStatus(pad, "READY");
 
